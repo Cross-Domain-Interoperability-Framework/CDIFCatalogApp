@@ -1,0 +1,44 @@
+# Development only: one command starts the database, the server and the web app.
+#   docker compose up --build      then open http://localhost:5173
+# The database password below is a local development value, not a secret.
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: catalog
+      POSTGRES_PASSWORD: catalog-dev
+      POSTGRES_DB: catalog
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog -d catalog"]
+      interval: 3s
+      retries: 20
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+
+  api:
+    build: ./server
+    environment:
+      DATABASE_URL: postgresql://catalog:catalog-dev@db:5432/catalog
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./server/app:/srv/app
+
+  web:
+    build: ./web
+    environment:
+      API_URL: http://api:8000
+      WATCH_POLL: "1"
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web/src:/app/src
+      - ./web/public:/app/public
+
+volumes:
+  dbdata:
