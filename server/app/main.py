@@ -8,7 +8,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
-from app import lookup
+from app import lookup, validate
 
 # Profiles a draft may be written against. The form files for each live in web/public/forms/.
 PROFILES = {"CoreDiscovery"}
@@ -48,6 +48,7 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="CDIF Catalog", lifespan=lifespan)
 app.include_router(lookup.router)
+app.include_router(validate.router)
 
 
 def database_status() -> str:
@@ -104,9 +105,24 @@ def read_draft(draft_id: UUID) -> dict:
 def update_draft(draft_id: UUID, body: DraftUpdate) -> dict:
     with connect() as conn:
         row = conn.execute(
-            f"UPDATE drafts SET document = %s, updated_at = now() WHERE id = %s RETURNING {COLUMNS}",
+            # an edit after submission makes it a draft again; it must be checked and submitted anew
+            f"UPDATE drafts SET document = %s, status = 'draft', updated_at = now() WHERE id = %s RETURNING {COLUMNS}",
             (Jsonb(body.document), draft_id),
         ).fetchone()
     if row is None:
         raise HTTPException(404, "No draft with that id.")
     return row
+
+
+@app.post("/api/drafts/{draft_id}/submit")
+def submit_draft(draft_id: UUID) -> dict:
+    """Mark a draft as submitted, but only if the server finds no violation in it. The check is
+    made here on the stored document, never taken from what the browser says it found."""
+    with connect() as conn:
+        row = conn.execute("SELECT profile, document FROM drafts WHERE id = %s", (draft_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "No draft with that id.")
+        report = validate.check(row["profile"], row["document"], str(draft_id))
+        if report["valid"]:
+            conn.execute("UPDATE drafts SET status = 'submitted', updated_at = now() WHERE id = %s", (draft_id,))
+    return {"submitted": report["valid"], **report}

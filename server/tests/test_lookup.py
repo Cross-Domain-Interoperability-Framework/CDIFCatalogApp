@@ -78,11 +78,11 @@ def test_datacite_maps_to_the_form_shapes():
                 "@type": "schema:Person",
                 "schema:name": "María Ortiz",
                 "schema:identifier": "https://orcid.org/0000-0002-1825-0097",
-                "schema:affiliation": {"schema:name": "Example University"},
+                "schema:affiliation": {"@type": "schema:Organization", "schema:name": "Example University"},
             },
             {"@type": "schema:Organization", "schema:name": "Example Working Group"},
             # no given/family split, an affiliation object, and an identifier that is not an ORCID
-            {"@type": "schema:Person", "schema:name": "Lee, K.", "schema:affiliation": {"schema:name": "Institute of Rocks"}},
+            {"@type": "schema:Person", "schema:name": "Lee, K.", "schema:affiliation": {"@type": "schema:Organization", "schema:name": "Institute of Rocks"}},
         ]
     }
 
@@ -123,7 +123,7 @@ def test_crossref_maps_authors_and_date():
             "@type": "schema:Person",
             "schema:name": "G. Kay",
             "schema:identifier": "https://orcid.org/0000-0002-1825-0097",
-            "schema:affiliation": {"schema:name": "Lab"},
+            "schema:affiliation": {"@type": "schema:Organization", "schema:name": "Lab"},
         },
         {"@type": "schema:Organization", "schema:name": "The Consortium"},
     ]

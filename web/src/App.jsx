@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
 import DoiPrefill from './DoiPrefill.jsx';
+import Report, { fieldIndex } from './Report.jsx';
 import { customRenderers } from './renderers.jsx';
 
 const renderers = [...materialRenderers, ...customRenderers];
@@ -50,7 +51,9 @@ const timeOf = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', 
 export default function App() {
   const [form, setForm] = useState(null);
   const [data, setData] = useState(null);
-  const [errors, setErrors] = useState([]);
+  const [report, setReport] = useState(null); // the server's last validation report
+  const [checkedText, setCheckedText] = useState(null); // the record that report was made for
+  const [submitted, setSubmitted] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [saveState, setSaveState] = useState({ kind: 'new' });
   const [formKey, setFormKey] = useState(0);
@@ -76,7 +79,7 @@ export default function App() {
           const draft = await api('GET', `/api/drafts/${id}`);
           document = draft.document;
           draftId.current = draft.id;
-          state = { kind: 'saved', at: draft.updated_at };
+          state = { kind: 'saved', at: draft.updated_at, submitted: draft.status === 'submitted' };
         } catch (e) {
           // 404: the draft is gone, start fresh. Anything else: keep the id and say so.
           if (e.status === 404) rememberDraftId(null);
@@ -88,6 +91,7 @@ export default function App() {
       setForm({ schema, uischema, defaults });
       setData(document);
       setSaveState(state);
+      setSubmitted(!!state.submitted);
     })().catch((e) => !cancelled && setLoadError(String(e)));
     return () => {
       cancelled = true;
@@ -128,17 +132,20 @@ export default function App() {
     timer.current = setTimeout(save, delay);
   }
 
-  function onChange({ data: d, errors: e }) {
+  function onChange({ data: d }) {
     setData(d);
-    setErrors(e || []);
     latest.current = d;
     // JSON Forms also calls this when it first renders; only a real change is worth saving.
-    if (JSON.stringify(d) !== savedText.current) schedule();
+    if (JSON.stringify(d) !== savedText.current) {
+      schedule();
+      setSubmitted(false); // the server makes an edited record a draft again
+    }
   }
 
   // A change made outside the form (DOI pre-fill): show it and save it like any other edit.
   function fill(next) {
     setData(next);
+    setSubmitted(false);
     latest.current = next;
     schedule();
   }
@@ -152,8 +159,30 @@ export default function App() {
     latest.current = form.defaults;
     setData(form.defaults);
     setSaveState({ kind: 'new' });
+    setReport(null);
+    setSubmitted(false);
     setFormKey((k) => k + 1); // remount so the form drops its own copy of the old record
   }
+
+  async function check() {
+    const document = latest.current || data;
+    const result = await api('POST', '/api/validate', { profile: PROFILE, document, id: draftId.current });
+    setReport(result);
+    setCheckedText(JSON.stringify(document));
+  }
+
+  // Submitting acts on the saved draft, so save first. The server checks the record again itself.
+  async function submit() {
+    clearTimeout(timer.current);
+    await save();
+    if (!draftId.current || failed.current) throw new Error('not saved');
+    const result = await api('POST', `/api/drafts/${draftId.current}/submit`);
+    setReport(result);
+    setCheckedText(savedText.current);
+    setSubmitted(result.submitted);
+  }
+
+  const fields = useMemo(() => (form ? fieldIndex(form.uischema) : {}), [form]);
 
   if (loadError) return <Alert severity="error">Could not load the form: {loadError}</Alert>;
   if (!form) return <Typography sx={{ m: 2 }}>Loading form...</Typography>;
@@ -192,10 +221,14 @@ export default function App() {
           onChange={onChange}
         />
       </Box>
-      <Alert severity={errors.length ? 'warning' : 'success'} data-testid="form-errors">
-        The form reports {errors.length} problem{errors.length === 1 ? '' : 's'}. This is only the
-        check built into the form; the server decides whether a record is valid.
-      </Alert>
+      <Report
+        report={report}
+        stale={report !== null && JSON.stringify(data) !== checkedText}
+        fields={fields}
+        submitted={submitted}
+        onCheck={check}
+        onSubmit={submit}
+      />
       <details>
         <summary>Record as it would be saved</summary>
         <pre data-testid="record-json" style={{ overflowX: 'auto', fontSize: 12 }}>

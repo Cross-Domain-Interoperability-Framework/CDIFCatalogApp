@@ -114,3 +114,8 @@ These are defects or questions in the source of the form files, not in this appl
 3. A new variable entry defaults its description to "missing".
 4. Three required catalog-record properties (`@id`, `schema:about`, and the record's own `@id`)
    have no field in the layout, so the form can never report zero problems.
+5. Found when the validation endpoint was built (17 November 2026): the generated form schema
+   holds `@type` on people, organisations and licences as a single string, where the profile
+   schema requires a list. A record straight from the form therefore fails the profile schema at
+   every such node. The server converts it on the way in; the form files should agree with the
+   schema instead.

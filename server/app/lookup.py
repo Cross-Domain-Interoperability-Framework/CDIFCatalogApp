@@ -159,7 +159,7 @@ def datacite_to_cdif(payload: dict) -> dict:
                 "@type": "schema:Person" if personal else "schema:Organization",
                 "schema:name": name,
                 "schema:identifier": f"https://orcid.org/{orcid.group(0)}" if orcid else None,
-                "schema:affiliation": {"schema:name": affiliation} if affiliation else None,
+                "schema:affiliation": {"@type": "schema:Organization", "schema:name": affiliation} if affiliation else None,
             }
         )
 
@@ -213,7 +213,7 @@ def crossref_to_cdif(payload: dict) -> dict:
                 "@type": "schema:Person" if is_person else "schema:Organization",
                 "schema:name": name,
                 "schema:identifier": f"https://orcid.org/{orcid.group(0)}" if orcid else None,
-                "schema:affiliation": {"schema:name": affiliation} if affiliation else None,
+                "schema:affiliation": {"@type": "schema:Organization", "schema:name": affiliation} if affiliation else None,
             }
         )
 

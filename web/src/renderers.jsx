@@ -40,7 +40,7 @@ function fromRegistry(type, option) {
     '@type': type,
     'schema:name': option.name,
     'schema:identifier': option.identifier,
-    'schema:affiliation': type === PERSON ? { 'schema:name': option.affiliations?.[0] } : undefined,
+    'schema:affiliation': type === PERSON ? { '@type': ORGANISATION, 'schema:name': option.affiliations?.[0] } : undefined,
   });
 }
 
@@ -114,7 +114,7 @@ function PartyRow({ entry, index, count, ordered, withRole, onChange, onMove, on
               id={`${idBase}-affiliation`}
               label="Affiliation"
               value={entry['schema:affiliation']?.['schema:name']}
-              onChange={(name) => set('schema:affiliation', { 'schema:name': name })}
+              onChange={(name) => set('schema:affiliation', { '@type': ORGANISATION, 'schema:name': name })}
             />
           )}
           {withRole && (
