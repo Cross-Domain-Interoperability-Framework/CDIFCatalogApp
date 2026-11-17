@@ -2,7 +2,7 @@
 
 A metadata catalog application in which the [CDIF](https://github.com/Cross-Domain-Interoperability-Framework) JSON-LD record is the stored record.
 
-**Status: planning. No code yet.**
+**Status: planning. No code yet.** The design is in [docs/design.md](docs/design.md).
 
 ## Intended scope
 
