@@ -58,6 +58,30 @@ Data managers can edit harvested records. Their edits are stored as an overlay s
 
 > **Decided:** edits to harvested records publish immediately. They do not go through curator review. Validation still runs on save.
 
+### How records are stored
+
+Records are stored in PostgreSQL as JSON documents (the `jsonb` column type). Each harvested record is one row holding its documents side by side.
+
+| Column | Type | Contents |
+|---|---|---|
+| Source, as received | text | The record exactly as the source sent it: ISO XML, DCAT Turtle, JSON-LD or another format. Never changed. |
+| Source format | text | What the as-received text is, so the right mapping can be chosen again. |
+| Source, as CDIF | jsonb | The as-received record after mapping to CDIF. Never edited by hand. |
+| Overlay | jsonb | A data manager's edits, keyed by top-level property. Empty for most records. |
+| Published | jsonb | Source-as-CDIF with the overlay applied. Search and the harvest interfaces serve this. |
+| Validation result | jsonb | Violations, advisories, and the CDIF profiles the record meets. |
+| Harvest source | reference | Which registered source the record came from. |
+| Identifier at source | text | The record's own identifier in the source system. With the harvest source, it finds the same record again on re-harvest. |
+| Content hash | text | A hash of the as-received text. If it is unchanged on re-harvest, nothing else is recomputed. |
+| Status and timestamps | | Published, conflict or withdrawn; first harvested, last harvested, last changed. |
+
+- **Why keep the record as received.** When a mapping is corrected or extended, every affected record is re-mapped from the stored text. Without it, a mapping fix would need a full re-harvest, and records whose source has gone offline could never be improved.
+- **Authored records** use the same table without the source columns: the document written in the editor is the published document. Drafts are held separately until they are submitted.
+- **Search does not read the JSON directly.** A flat search row is derived from each published record on save: title, description, keywords, a geometry for the bounding box, date ranges and a full-text index. The JSON is the record; the search row is an index that can be rebuilt from it at any time.
+- **ISO and DCAT output** are stored the same way: derived from the published record on publish, never edited.
+
+Built so far: only the drafts table. The layout above is the design for the harvesting work.
+
 ## Who submits, and how
 
 ### Domain scientists: a guided form
