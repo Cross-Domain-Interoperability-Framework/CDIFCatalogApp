@@ -19,6 +19,10 @@ services:
     build: ./server
     environment:
       DATABASE_URL: postgresql://catalog:catalog-dev@db:5432/catalog
+    # Optional settings such as ORCID_API_BASE; see docs/setup-sandboxes.md.
+    env_file:
+      - path: .env
+        required: false
     depends_on:
       db:
         condition: service_healthy
