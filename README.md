@@ -2,7 +2,25 @@
 
 A metadata catalog application in which the [CDIF](https://github.com/Cross-Domain-Interoperability-Framework) JSON-LD record is the stored record.
 
-**Status: planning. No code yet.** The design is in [docs/design.md](docs/design.md).
+**Status: early prototype.** The design is in [docs/design.md](docs/design.md).
+
+So far the repository holds a skeleton: a web app that renders the CDIF `CoreDiscovery` submission form, a server with a health check, and a database. Nothing is saved or validated yet. The first findings about the form are in [docs/form-inventory.md](docs/form-inventory.md).
+
+## Run it
+
+Requires Docker.
+
+```bash
+docker compose up --build
+```
+
+Then open http://localhost:5173. Stop it with `docker compose down`.
+
+| Folder | Contents |
+|---|---|
+| `web/` | React app using JSON Forms. Form files are in `web/public/forms/`, pinned to a commit of metadataBuildingBlocks. |
+| `server/` | FastAPI server. Run its tests with `pytest` from `server/` after `pip install -r requirements-dev.txt` in a virtual environment. |
+| `docs/` | Design and findings. |
 
 ## Intended scope
 
