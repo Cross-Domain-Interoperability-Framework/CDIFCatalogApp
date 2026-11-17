@@ -22,6 +22,21 @@ jobs:
 
   server:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: catalog
+          POSTGRES_PASSWORD: catalog-ci
+          POSTGRES_DB: catalog
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U catalog -d catalog"
+          --health-interval 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://catalog:catalog-ci@localhost:5432/catalog
     defaults:
       run:
         working-directory: server

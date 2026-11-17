@@ -4,7 +4,7 @@ A metadata catalog application in which the [CDIF](https://github.com/Cross-Doma
 
 **Status: early prototype.** The design is in [docs/design.md](docs/design.md).
 
-So far the repository holds a skeleton: a web app that renders the CDIF `CoreDiscovery` submission form, a server with a health check, and a database. Nothing is saved or validated yet. The first findings about the form are in [docs/form-inventory.md](docs/form-inventory.md).
+So far: a web app that renders the CDIF `CoreDiscovery` submission form and saves the record as a draft while you type, a server that stores drafts, and a database. There is no sign-in and no validation yet, so a draft is tied to the browser it was started in. The first findings about the form are in [docs/form-inventory.md](docs/form-inventory.md).
 
 ## Run it
 
@@ -19,7 +19,7 @@ Then open http://localhost:5173. Stop it with `docker compose down`.
 | Folder | Contents |
 |---|---|
 | `web/` | React app using JSON Forms. Form files are in `web/public/forms/`, pinned to a commit of metadataBuildingBlocks. |
-| `server/` | FastAPI server. Run its tests with `pytest` from `server/` after `pip install -r requirements-dev.txt` in a virtual environment. |
+| `server/` | FastAPI server. Its tests need the database, so run them in the running container: `docker compose exec api pytest`. |
 | `docs/` | Design and findings. |
 
 ## Intended scope
