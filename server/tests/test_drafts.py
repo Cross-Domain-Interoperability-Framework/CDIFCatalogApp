@@ -65,3 +65,36 @@ def test_unknown_profile_is_rejected(client):
 def test_document_must_be_an_object(client):
     res = client.post("/api/drafts", json={"profile": "CoreDiscovery", "document": "text"})
     assert res.status_code == 422
+
+
+VALID = {
+    "@type": ["schema:Dataset"],
+    "schema:name": "Zircon ages",
+    "schema:identifier": "https://doi.org/10.5555/x",
+    "schema:dateModified": "2024-03-30",
+    "schema:url": "https://repository.example/1",
+    "schema:license": [
+        {"@type": "schema:CreativeWork", "schema:name": "CC BY 4.0", "schema:url": "https://creativecommons.org/licenses/by/4.0/"}
+    ],
+}
+
+
+def test_submit_is_refused_while_the_record_has_violations(client):
+    draft = new_draft(client, {"@type": ["schema:Dataset"], "schema:name": "Only a name"})
+    res = client.post(f"/api/drafts/{draft['id']}/submit").json()
+    assert res["submitted"] is False and res["counts"]["violation"] > 0
+    assert client.get(f"/api/drafts/{draft['id']}").json()["status"] == "draft"
+
+
+def test_a_valid_record_submits_and_an_edit_makes_it_a_draft_again(client):
+    draft = new_draft(client, VALID)
+    res = client.post(f"/api/drafts/{draft['id']}/submit").json()
+    assert res["submitted"] is True
+    assert res["record"]["@id"] == f"urn:uuid:{draft['id']}"
+    assert client.get(f"/api/drafts/{draft['id']}").json()["status"] == "submitted"
+    edited = client.put(f"/api/drafts/{draft['id']}", json={"document": {**VALID, "schema:name": "x"}})
+    assert edited.json()["status"] == "draft"
+
+
+def test_submitting_an_unknown_draft_is_404(client):
+    assert client.post(f"/api/drafts/{uuid4()}/submit").status_code == 404
