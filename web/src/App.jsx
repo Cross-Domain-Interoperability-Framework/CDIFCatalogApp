@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
+import DoiPrefill from './DoiPrefill.jsx';
+import { customRenderers } from './renderers.jsx';
+
+const renderers = [...materialRenderers, ...customRenderers];
 
 const PROFILE = 'CoreDiscovery';
 const DRAFT_KEY = `cdif-draft-id:${PROFILE}`;
@@ -132,6 +136,13 @@ export default function App() {
     if (JSON.stringify(d) !== savedText.current) schedule();
   }
 
+  // A change made outside the form (DOI pre-fill): show it and save it like any other edit.
+  function fill(next) {
+    setData(next);
+    latest.current = next;
+    schedule();
+  }
+
   function startNew() {
     clearTimeout(timer.current);
     rememberDraftId(null);
@@ -169,13 +180,14 @@ export default function App() {
       >
         {saveText}
       </Typography>
+      <DoiPrefill data={data} onFill={fill} />
       <Box sx={{ my: 2 }}>
         <JsonForms
           key={formKey}
           schema={form.schema}
           uischema={form.uischema}
           data={data}
-          renderers={materialRenderers}
+          renderers={renderers}
           cells={materialCells}
           onChange={onChange}
         />

@@ -8,6 +8,8 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
+from app import lookup
+
 # Profiles a draft may be written against. The form files for each live in web/public/forms/.
 PROFILES = {"CoreDiscovery"}
 
@@ -45,6 +47,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="CDIF Catalog", lifespan=lifespan)
+app.include_router(lookup.router)
 
 
 def database_status() -> str:

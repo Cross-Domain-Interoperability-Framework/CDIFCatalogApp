@@ -4,7 +4,9 @@ A metadata catalog application in which the [CDIF](https://github.com/Cross-Doma
 
 **Status: early prototype.** The design is in [docs/design.md](docs/design.md).
 
-So far: a web app that renders the CDIF `CoreDiscovery` submission form and saves the record as a draft while you type, a server that stores drafts, and a database. There is no sign-in and no validation yet, so a draft is tied to the browser it was started in. The first findings about the form are in [docs/form-inventory.md](docs/form-inventory.md).
+So far: a web app that renders the CDIF `CoreDiscovery` submission form, fills it from a DOI, finds people in ORCID and organisations in ROR, and saves the record as a draft while you type. There is no sign-in and no validation yet, so a draft is tied to the browser it was started in.
+
+Setting up ORCID and DOI test accounts is described in [docs/setup-sandboxes.md](docs/setup-sandboxes.md). The first findings about the form are in [docs/form-inventory.md](docs/form-inventory.md).
 
 ## Run it
 
