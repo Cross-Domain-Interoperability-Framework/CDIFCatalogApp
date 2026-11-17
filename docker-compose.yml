@@ -26,6 +26,7 @@ services:
       - "8000:8000"
     volumes:
       - ./server/app:/srv/app
+      - ./server/tests:/srv/tests
 
   web:
     build: ./web
