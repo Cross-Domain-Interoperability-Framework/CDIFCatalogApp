@@ -1,8 +1,13 @@
 """Harvests a web-accessible folder: a directory listing page with one file per record.
 
-Apache, nginx and IIS each write their listing differently, so each has its own parser, chosen
-by the response's `Server` header. A listing's modified date lets an unchanged file be skipped
-without fetching it.
+Apache and nginx write their listings differently, so each has its own parser, chosen by the
+response's `Server` header. A listing's modified date lets an unchanged file be skipped without
+fetching it.
+
+There is no parser for IIS listings: no source we expect to harvest uses IIS. A folder on IIS is
+still harvested, because its links are found, but its dates are not read, so every file is
+fetched on every run. An IIS parser was written and removed on 19 November 2026; it is in the
+history of this file if one is needed.
 """
 import re
 from datetime import datetime
@@ -26,13 +31,8 @@ _APACHE = re.compile(
 )
 # nginx: <a href="a.json">a.json</a>       30-Mar-2024 12:01      1234
 _NGINX = re.compile(_LINK + r"\s*(?P<date>\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2})?", _FLAGS)
-# IIS: the date comes before the link, in US order with AM or PM, and the address is absolute.
-#   3/30/2024 12:01 PM         1234 <A HREF="/folder/a.json">a.json</A><br>
-_IIS = re.compile(
-    r"(?P<date>\d{1,2}/\d{1,2}/\d{4}\s+\d{1,2}:\d{2}\s+[AP]M)\s+(?:&lt;dir&gt;|\d+)\s+" + _LINK, _FLAGS
-)
 
-_DATE_FORMATS = ("%Y-%m-%d %H:%M", "%d-%b-%Y %H:%M", "%m/%d/%Y %I:%M %p")
+_DATE_FORMATS = ("%Y-%m-%d %H:%M", "%d-%b-%Y %H:%M")
 
 
 def _iso(text: str | None) -> str | None:
@@ -60,10 +60,6 @@ def parse_nginx(html: str):
     return _entries(_NGINX, html)
 
 
-def parse_iis(html: str):
-    return _entries(_IIS, html)
-
-
 def parser_for(server_header: str | None):
     """The parser for the server that wrote the listing, or None when the header does not say."""
     server = (server_header or "").lower()
@@ -71,8 +67,6 @@ def parser_for(server_header: str | None):
         return parse_apache
     if "nginx" in server:
         return parse_nginx
-    if "iis" in server:
-        return parse_iis
     return None
 
 
@@ -82,7 +76,7 @@ def parse_listing(html: str, server_header: str | None = None):
     parser = parser_for(server_header)
     if parser:
         return parser(html)
-    results = [p(html) for p in (parse_apache, parse_nginx, parse_iis)]
+    results = [p(html) for p in (parse_apache, parse_nginx)]
     return max(results, key=lambda entries: (sum(1 for _, d in entries if d), len(entries)))
 
 

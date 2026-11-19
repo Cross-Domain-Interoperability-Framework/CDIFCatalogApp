@@ -110,7 +110,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `app/store.py` | The `records` table and the harvest tables, the database connection, and the queries more than one module uses. |
 | `app/access.py` | Who may see or edit a record, decided by labels on records and on users. Everyone is anonymous until sign-in exists. |
 | `app/harvest/__init__.py` | What every harvester provides: gather, fetch, and mapping to CDIF. |
-| `app/harvest/waf.py` | The web folder harvester, with separate parsers for Apache, nginx and IIS directory listings. |
+| `app/harvest/waf.py` | The web folder harvester, with separate parsers for Apache and nginx directory listings. |
 | `app/harvest/run.py` | Runs one job: compares the source with what is stored, records each record's outcome, and writes errors as rows. Also scheduling and time-outs. |
 | `app/harvest/worker.py` | The worker loop: `python -m app.harvest.worker`. |
 | `app/harvest/api.py` | `/api/harvest/…`: register sources, start, stop and read runs. |

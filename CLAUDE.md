@@ -90,7 +90,9 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   compare graphs, not strings.
 - **A web folder listing may carry no dates.** Apache without fancy indexing sends a bare list,
   so every file is fetched on every run and recognised as unchanged only by its content hash.
-- **The IIS listing parser has never met a live IIS server.** nginx and Apache were checked live.
+- **There is no IIS listing parser.** One was written and removed because no expected source uses
+  IIS; an IIS folder is still harvested, without date skipping. Add a parser only when a real IIS
+  source turns up, and test it against that source.
 - **Git Bash rewrites `/srv/...` arguments into Windows paths.** Prefix a `docker compose exec`
   that passes a container path with `MSYS_NO_PATHCONV=1`.
 - **`web/vite.config.js` is baked into the web image**, not mounted. A proxy change needs the
