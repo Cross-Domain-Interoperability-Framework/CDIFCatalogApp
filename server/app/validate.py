@@ -24,6 +24,7 @@ from rdflib import BNode, Graph, Namespace, URIRef
 from rdflib.namespace import RDF
 
 PROFILE_DIR = Path(__file__).parent / "profiles"
+MESSAGE_DIR = Path(__file__).parent / "messages"
 SH = Namespace("http://www.w3.org/ns/shacl#")
 SEVERITY = {SH.Violation: "violation", SH.Warning: "warning", SH.Info: "info"}
 CONFORMANCE_PREFIX = "https://w3id.org/cdif/"
@@ -46,6 +47,15 @@ def load(profile: str) -> dict:
         "fields": [p for p in schema["properties"] if not p.startswith("@")],
         "conformance": sorted(_conformance_uris(schema["properties"]["schema:subjectOf"])),
     }
+
+
+@lru_cache
+def plain_messages(profile: str) -> dict:
+    """Each rule's message -> the same thing in plain words (messages/<profile>.json). The rules
+    are written for people who know the schema; the report is read by people who do not. A rule
+    with no entry keeps its own wording, and a test fails until it has one."""
+    path = MESSAGE_DIR / f"{profile}.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
 
 def _conformance_uris(node, inside=False) -> set:
@@ -272,8 +282,10 @@ def _field_named_in(message: str, fields: list) -> list:
     return [min(hits)[1]] if hits else []
 
 
-def shacl_findings(spec: dict, record: dict) -> list[dict]:
+def shacl_findings(spec: dict, record: dict, plain: dict | None = None) -> list[dict]:
     import pyshacl
+
+    plain = plain or {}
 
     data = Graph().parse(data=json.dumps(record), format="json-ld")
     _, report, _ = pyshacl.validate(
@@ -292,7 +304,8 @@ def shacl_findings(spec: dict, record: dict) -> list[dict]:
             path = path + [_compact(str(result_path), prefixes)]
         message = " ".join(str(report.value(result, SH.resultMessage) or "").split())
         if not path:
-            path = _field_named_in(message, spec["fields"])
+            path = _field_named_in(message, spec["fields"])  # from the rule's own wording
+        message = plain.get(message, message)
         severity = SEVERITY.get(report.value(result, SH.resultSeverity), "violation")
         key = (severity, tuple(path), message)
         if key in seen:  # the same rule is declared in more than one building block
@@ -335,19 +348,25 @@ def _merge(schema: list, rules: list) -> list:
     return schema_kept + rules_kept
 
 
-def check(profile: str, document: dict, record_id: str | None = None) -> dict:
+def check_record(profile: str, record: dict) -> dict:
+    """Validate a complete record as it stands. Harvested records come this way: they already
+    carry their own identifier and catalog record, which must not be rewritten."""
     spec = load(profile)
-    record = prepare(profile, document, record_id)
     findings = schema_findings(spec, record)
     # SHACL reads the record as a graph. If the schema already rejected it the graph may not
     # mean what the author intended, but its advice about missing recommended fields still helps.
-    findings = _merge(findings, shacl_findings(spec, record))
+    findings = _merge(findings, shacl_findings(spec, record, plain_messages(profile)))
     for f in findings:
         f["property"] = f["path"][0] if f["path"] else None
         f["where"] = _where(f["path"])
     findings.sort(key=lambda f: (ORDER[f["severity"]], str(f["property"])))
     counts = {s: sum(f["severity"] == s for f in findings) for s in ORDER}
     return {"valid": counts["violation"] == 0, "counts": counts, "findings": findings, "record": record}
+
+
+def check(profile: str, document: dict, record_id: str | None = None) -> dict:
+    """Validate a document from the form, after completing it into a record."""
+    return check_record(profile, prepare(profile, document, record_id))
 
 
 class CheckRequest(BaseModel):

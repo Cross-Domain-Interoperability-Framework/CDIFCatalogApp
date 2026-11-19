@@ -24,7 +24,7 @@ The requirement is small. The platform carrying it is large and its canonical mo
 
 | Layer                   | Choice                                                                                                                                                                       | Already in hand                                                                                                                       |
 |-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| Harvest                 | Small Python connectors, one YAML file per source. Scheduled by cron at first; Dagster if sources pass about 50.                                                             | Sitemap crawling and conformance dispatch, to port from the fork's Simple URL harvester.                                              |
+| Harvest                 | Small Python connectors. Sources are registered in the database and run by a worker that reads a job table; Dagster if sources pass about 50.                               | Sitemap crawling and conformance dispatch, to port from the fork's Simple URL harvester.                                              |
 | Mapping                 | XML through XSLT 3 run from Python (`saxonche`). JSON and RDF through SSSOM-table converters. All map straight to CDIF.                                                      | `iso19115-3-to-cdif.xsl` and the DDE transforms are reusable as they are. The DCAT and Croissant converters are already table-driven. |
 | Validation              | JSON Schema plus SHACL on every save and every harvest.                                                                                                                      | The building block schemas and rules, `FrameAndValidate`, `detect_conformance`.                                                       |
 | Store and search        | PostgreSQL with JSONB, PostGIS and full-text search.                                                                                                                         | New.                                                                                                                                  |
@@ -80,7 +80,25 @@ Records are stored in PostgreSQL as JSON documents (the `jsonb` column type). Ea
 - **Search does not read the JSON directly.** A flat search row is derived from each published record on save: title, description, keywords, a geometry for the bounding box, date ranges and a full-text index. The JSON is the record; the search row is an index that can be rebuilt from it at any time.
 - **ISO and DCAT output** are stored the same way: derived from the published record on publish, never edited.
 
-Built so far: only the drafts table. The layout above is the design for the harvesting work.
+Built so far: the drafts table, and the `records` table with the layout above. Harvested records fill it; publishing a submitted draft into it is not built.
+
+### How harvests are stored
+
+The model is the one ckanext-harvest uses, reimplemented.
+
+| Table | One row is | Holds |
+|---|---|---|
+| `harvest_sources` | A registered source | Address, type, settings, owning organisation, how often it runs and when it runs next. |
+| `harvest_jobs` | One run of a source | Its state (new, running, finished, aborted) and when each stage started and ended. |
+| `harvest_objects` | One source record seen in one run | The record's identifier at the source, the source's modified date, and how it ended: added, updated, not modified, deleted or errored. |
+| `harvest_errors` | One failure | The run, the record if there was one, the stage (gather, fetch, import or job) and the message. |
+
+- **Three stages.** Every kind of source provides gather (list what it holds), fetch (get one record as sent) and a mapping to CDIF. The runner does everything else.
+- **Changed since, only after a clean run.** A source is asked for changes since the last run that finished with no errors. After a run with errors the next asks for everything, so a failure cannot hide a record for good.
+- **Deletion needs a complete listing.** A record missing from a full listing is withdrawn. A "changed since" listing says nothing about what it leaves out.
+- **Invalid records are stored, not published.** The text as received is kept, the problem is an error row, and the record is not served.
+- **The queue is the job table.** A worker claims a waiting job with a row lock that other workers skip. There is no message broker.
+- **Not built:** email to an organisation's admins when a run fails, because there are no users to send it to until sign-in exists.
 
 ## Who submits, and how
 
@@ -153,6 +171,7 @@ A record is offered only in formats its content can honestly fill. The catalog r
 
 - **One CDIF document per record.** The CDIF profiles are layers of one record, so the catalog serves the full record, declaring every profile it meets. A harvester asking for Discovery receives a record that also carries the richer layers. A profile parameter filters which records are returned; it does not cut records down.
 - **Asking for a format.** A format and profile parameter on the record address, plus standard content negotiation. Profiles are named by their published CDIF conformance addresses.
+- **A record with no description still goes out as DCAT.** DCAT-AP requires a description and CDIF does not, so the DCAT description is then the title followed by "description missing".
 - **DCAT output loses detail, and says so.** DCAT-AP has no place for variable-level description or data structure. The mapping table states what is dropped, as the existing converters do.
 - **New work.** A CDIF-to-DCAT mapping. The existing DCAT-to-CDIF table is the starting point but runs the other way.
 
@@ -215,6 +234,21 @@ The form schema for each profile is already generated from the building blocks. 
 6.  **Harvest registration, overlay editing and conflict handling** for data managers.
 7.  **DDE editor layout and the remaining custom controls.**
 8.  **Retire GeoNetwork.** Until then it stays up and is harvested over CSW.
+
+## To do: practices taken from CKAN
+
+CKAN is not the base for this catalog (see Alternatives considered), but a review of `ckan`, `ckanext-dcat`, `ckanext-spatial`, `ckanext-harvest` and `ckanext-scheming` on 18 and 19 November 2026 found practices worth adopting. All but `ckanext-scheming` are AGPL, so each item below is reimplemented here, not copied.
+
+All six were built on 19 November 2026, each as a first version. What each still lacks is in the last column.
+
+| To do | Detail | Belongs to step | Built, and what is missing |
+|---|---|---|---|
+| **Test DCAT output against the official shapes** | Serialise records as DCAT-AP and GeoDCAT-AP, then run pyshacl against the SHACL shapes published by SEMIC. Fetch the shapes from SEMIC and pin them, as the CDIF schema and rules are pinned. | 5 | Built for DCAT-AP 3.0.0 and GeoDCAT-AP 3.0.0, on the three example records. |
+| **DCAT catalog feed with the interface CKAN uses** | `/catalog.{ttl,jsonld,xml}` with `page`, `modified_since` and `profiles=` parameters, and Hydra paging triples (`hydra:PagedCollection` with first, next, last and total). Existing DCAT harvesters, CKAN's included, already walk this. | 5 | Built. Not yet walked by a real CKAN harvester. Lists harvested records only. |
+| **Record address answers by `Accept` header** | The record address serves HTML, CDIF JSON-LD, DCAT JSON-LD or DCAT Turtle according to the request's `Accept` header, and the HTML page advertises the others with `<link rel="alternate">`. | 3 and 5 | Built. The web page is a plain summary, not the designed record page. |
+| **Web folder listings: three parsers** | Apache, nginx and IIS directory listings differ. Parse each separately, choosing by the response's `Server` header, and take the modified date from the listing to skip unchanged files. | 2 | Built, for folders of CDIF JSON-LD. nginx and Apache checked live; IIS not. |
+| **Organisation-scoped access by labels** | Each record carries labels (`public`, `member-<organisation>`, `creator-<user>`), each user carries labels, and search and edit checks filter on the overlap. This is how the data managers' organisation-scoped harvest-edit permission is built. | 3 and 6 | Labels and the checks are built and the feed uses them. With no sign-in, every reader is anonymous. |
+| **Plain-language labels and help text** | Write a label and one line of help for every form field, and rewrite the SHACL rule messages shown in the validation report. CKAN's DCAT-AP form schemas are reference wording only; the text here is our own. | 7, and the report before the scientist sessions | Built for `CoreDiscovery`: 65 fields and 122 rule messages. Not yet read by a scientist. |
 
 ## Spike build plan
 
@@ -291,7 +325,7 @@ If the day 2 inventory shows the stock form is unusable in ways the planned cust
 
 ## Open questions
 
-- Which DCAT-AP and GeoDCAT-AP versions should the feed target?
+- Which DCAT-AP and GeoDCAT-AP versions should the feed target? Built against 3.0.0 of both; GeoDCAT-AP 3.1.0 also exists.
 - Which identity provider: ORCID alone, or ORCID plus an institutional login for staff?
 - Where do the SKOS vocabularies live once GeoNetwork is retired?
 

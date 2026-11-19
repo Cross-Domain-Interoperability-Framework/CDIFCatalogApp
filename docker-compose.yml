@@ -19,6 +19,8 @@ services:
     build: ./server
     environment:
       DATABASE_URL: postgresql://catalog:catalog-dev@db:5432/catalog
+      # The address written into the catalog feed and record pages: the one a browser uses.
+      PUBLIC_URL: http://localhost:5173
     # Optional settings such as ORCID_API_BASE; see docs/setup-sandboxes.md.
     env_file:
       - path: .env
@@ -31,6 +33,21 @@ services:
     volumes:
       - ./server/app:/srv/app
       - ./server/tests:/srv/tests
+
+  # Runs harvest jobs: scheduled ones, and those started through /api/harvest.
+  worker:
+    build: ./server
+    command: ["python", "-m", "app.harvest.worker"]
+    environment:
+      DATABASE_URL: postgresql://catalog:catalog-dev@db:5432/catalog
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./server/app:/srv/app
 
   web:
     build: ./web

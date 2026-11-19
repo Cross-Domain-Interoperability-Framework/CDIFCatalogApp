@@ -5,12 +5,16 @@ import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@
 import DoiPrefill from './DoiPrefill.jsx';
 import Report, { fieldIndex } from './Report.jsx';
 import { customRenderers } from './renderers.jsx';
+import { labelOf, translator, withWordingKeys } from './wording.js';
 
 const renderers = [...materialRenderers, ...customRenderers];
 
 const PROFILE = 'CoreDiscovery';
 const DRAFT_KEY = `cdif-draft-id:${PROFILE}`;
 const SAVE_DELAY_MS = 1500;
+const i18n = { locale: 'en-GB', translate: translator(PROFILE) };
+// Help text is shown under every field all the time, not only while the field has focus.
+const config = { showUnfocusedDescription: true };
 const RETRY_DELAY_MS = 5000;
 
 async function loadJson(name) {
@@ -88,7 +92,7 @@ export default function App() {
       }
       if (cancelled) return;
       savedText.current = JSON.stringify(document);
-      setForm({ schema, uischema, defaults });
+      setForm({ schema, uischema: withWordingKeys(uischema), defaults });
       setData(document);
       setSaveState(state);
       setSubmitted(!!state.submitted);
@@ -182,7 +186,10 @@ export default function App() {
     setSubmitted(result.submitted);
   }
 
-  const fields = useMemo(() => (form ? fieldIndex(form.uischema) : {}), [form]);
+  const fields = useMemo(
+    () => (form ? fieldIndex(form.uischema, (control) => labelOf(PROFILE, control.i18n)) : {}),
+    [form],
+  );
 
   if (loadError) return <Alert severity="error">Could not load the form: {loadError}</Alert>;
   if (!form) return <Typography sx={{ m: 2 }}>Loading form...</Typography>;
@@ -218,6 +225,8 @@ export default function App() {
           data={data}
           renderers={renderers}
           cells={materialCells}
+          i18n={i18n}
+          config={config}
           onChange={onChange}
         />
       </Box>
