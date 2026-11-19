@@ -136,8 +136,8 @@ def test_every_format_has_a_label_and_converters_point_into_the_converters_repos
 def test_cdif_passes_straight_through_and_everything_else_says_why_not():
     text = (FIXTURES / "exampleCDIFDiscoveryMinimal.json").read_text(encoding="utf-8")
     assert convert.to_cdif(detect(text), text) == json.loads(text)
-    with pytest.raises(HarvestError, match="ISO 19139 XML.*ISO19115/iso_to_cdif.py.*not connected"):
-        convert.to_cdif(detect(XML["iso19139"]), XML["iso19139"])
+    with pytest.raises(HarvestError, match="DCAT RDF/XML.*DCAT/dcat_to_cdif.py.*not connected"):
+        convert.to_cdif(detect(XML["dcat-rdfxml"]), XML["dcat-rdfxml"])
     with pytest.raises(HarvestError, match="FGDC CSDGM XML.*no converter"):
         convert.to_cdif(detect(XML["fgdc"]), XML["fgdc"])
     with pytest.raises(HarvestError, match="not valid JSON"):

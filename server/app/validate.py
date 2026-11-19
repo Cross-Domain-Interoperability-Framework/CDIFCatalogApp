@@ -86,6 +86,20 @@ def profile_for(conforms_to, default: str) -> str:
     return best
 
 
+def declare(profile: str, record: dict) -> dict:
+    """Add the profile's conformance addresses to a record's catalog record, keeping what is
+    there. For a record the catalog itself produced by converting another format: the claim is
+    the catalog's to make, and it is only published if the check that follows bears it out."""
+    about = record.get("schema:subjectOf")
+    if not isinstance(about, dict):
+        return record  # no catalog record to add to; the check will say so
+    listed = about.get("dcterms:conformsTo")
+    listed = listed if isinstance(listed, list) else ([listed] if listed else [])
+    have = {(c.get("@id") if isinstance(c, dict) else c) for c in listed}
+    about["dcterms:conformsTo"] = listed + [{"@id": uri} for uri in load(profile)["conformance"] if uri not in have]
+    return record
+
+
 def strip_empty(value):
     """Remove what the form leaves behind for untouched fields: blank text, empty lists, and
     objects holding nothing but a type marker. Returns None when nothing is left."""
@@ -305,13 +319,15 @@ def shacl_findings(spec: dict, record: dict, plain: dict | None = None) -> list[
     _, report, _ = pyshacl.validate(
         data, shacl_graph=spec["shapes"], advanced=True, inference="none", allow_warnings=True
     )
-    prefixes = record["@context"]
-    root = URIRef(record["@id"])
+    # A harvested record may lack either of these; the schema check reports that, and this one
+    # must not fall over on it.
+    prefixes = record.get("@context") if isinstance(record.get("@context"), dict) else {}
+    root = URIRef(record["@id"]) if isinstance(record.get("@id"), str) else None
     seen, out = set(), []
     for result in report.subjects(RDF.type, SH.ValidationResult):
         focus = report.value(result, SH.focusNode)
         result_path = report.value(result, SH.resultPath)
-        path = _path_from_root(data, root, focus, prefixes)
+        path = _path_from_root(data, root, focus, prefixes) if root is not None else None
         if path is None:
             path = []
         if isinstance(result_path, URIRef):

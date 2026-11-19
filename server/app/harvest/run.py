@@ -218,6 +218,10 @@ def _harvest_one(conn, harvester, source: dict, obj: dict, http, force: bool = F
     problem = None
     try:
         cdif = convert.to_cdif(detected, fetched.content)
+        if detected.format != "cdif-jsonld":
+            # The catalog made this record, so the catalog says what it conforms to. The check
+            # below decides whether that is true; if not, the record is not published.
+            cdif = validate.declare(profile, cdif)
         conflicts = store.overlay_conflicts(known["source_cdif"] if known else None, cdif, overlay)
         if conflicts:
             # Changed at the source in a property a data manager has overridden: keep what is

@@ -27,8 +27,9 @@ What works today:
 - **Harvesting from web folders:** register a folder of metadata files, run it by hand or on a
   schedule, and read what each run added, updated, skipped, withdrew or could not import. Each
   file's format is recognised from its content. CDIF JSON-LD is taken in and checked against the
-  profiles it declares; other formats are kept as received and reported. The harvester obeys
-  each site's `robots.txt`.
+  profiles it declares. ISO 19139, ISO 19115-2, ISO 19115-3 and DDI-CDI XML are converted to CDIF
+  by the CDIF converters and published when the result passes. Other formats are kept as
+  received and reported. The harvester obeys each site's `robots.txt`.
 - **DCAT catalog feed:** published records as DCAT-AP 3 or GeoDCAT-AP 3, in Turtle, JSON-LD or
   RDF/XML, paged the way CKAN's DCAT harvester expects.
 - **Record addresses:** each published record answers as a web page, CDIF JSON-LD, DCAT JSON-LD or
@@ -39,16 +40,16 @@ What works today:
 
 What does not exist yet: ownership of drafts (a draft is tied to the browser it was started in,
 and anyone who knows its address can read it, signed in or not), harvesters for anything but web
-folders, connected converters from other formats into CDIF (they exist in the CDIF `converters`
-repository; see `server/app/harvest/convert.py`), search, CSW, OGC API Records, the sitemap, and any
+folders, converters for DCAT, SDMX and the formats with none (see `docs/design.md`), search, CSW, OGC API Records, the sitemap, and any
 review step after submission. A submitted record is not published: only harvested records appear
 in the feed. See [Intended scope](#intended-scope).
 
 ## Run it
 
-Requires Docker.
+Requires Docker. The converters are a git submodule, so fetch them first:
 
 ```bash
+git submodule update --init
 docker compose up --build
 ```
 
@@ -119,7 +120,9 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `app/auth.py` | `/api/auth/…`: sign-in with ORCID, sessions, who the current user is, and the check that guards the harvest API. |
 | `app/harvest/__init__.py` | What every harvester provides: gather and fetch. |
 | `app/harvest/detect.py` | Recognises what a harvested document is from its content: CDIF and other JSON-LD, plain JSON, the XML metadata formats, Turtle. Lists every format and the converter for it. |
-| `app/harvest/convert.py` | Turns a recognised document into CDIF. Only CDIF JSON-LD is connected; this is where a converter is plugged in. |
+| `app/harvest/convert.py` | Turns a recognised document into CDIF, through the connected converter for its format. |
+| `app/harvest/converters.py` | Loads the converter scripts from `server/converters` and calls each the way its own command line does. |
+| `converters/` | A git submodule: the CDIF [`converters`](https://github.com/Cross-Domain-Interoperability-Framework/converters) repository, pinned to a commit. Not edited here. |
 | `app/harvest/robots.py` | Obeys a site's `robots.txt`: what may be fetched, and the delay between requests. |
 | `app/harvest/waf.py` | The web folder harvester. It reads a listing page for its links and asks each file for its own modified date. |
 | `app/harvest/run.py` | Runs one job: compares the source with what is stored, records each record's outcome, and writes errors as rows. Also scheduling and time-outs. |

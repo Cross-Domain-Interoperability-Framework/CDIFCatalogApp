@@ -25,6 +25,7 @@ Records and the sitemap. Do not start those without being asked.
 Everything runs in Docker. There is no local Python or Node setup to rely on.
 
 ```bash
+git submodule update --init          # once after cloning: fetches server/converters
 docker compose up --build            # db, api (8000), worker, web (5173); open http://127.0.0.1:5173
 docker compose exec api pytest       # server tests; they need the database, so run them here
 docker compose up -d --build api worker   # after changing server/requirements*.txt
@@ -55,6 +56,21 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
 
 ## Traps
 
+- **`server/converters` is a git submodule and is not edited here.** A converter's defect is an
+  issue for the `converters` repository. To move to a newer commit: `git -C server/converters
+  fetch && git -C server/converters checkout <commit>`, run the tests, then commit the submodule
+  pointer. `test_converters.py` runs the real converters on their own examples and fails if the
+  submodule is missing or a converter's call signature has changed. Its nested `validation`
+  submodule is deliberately not fetched; the converters are called with `detect=False`.
+- **A converted record gets the catalog's own conformance claim** (`validate.declare`) before it
+  is checked, because the catalog made the record. A CDIF record that was harvested as CDIF
+  keeps exactly what it declared.
+- **The converters are scripts, not a package.** `converters.py` loads each from its file and
+  puts its folder on the import path. New Python dependencies of a converter go in
+  `server/requirements.txt` (today: `lxml`, `pyld`, `requests`).
+- **Some converters are slow or return shapes the catalog cannot take.** DDI 1.2.2 and Codebook
+  2.5 return an `@graph` of nodes, which is reported, not stored. A large FAIR2 record took over
+  a minute to convert and check.
 - **Files copied from elsewhere are not edited here.** From metadataBuildingBlocks:
   `web/public/forms/CoreDiscovery/*`, `server/app/profiles/CoreDiscovery/*` and
   `server/tests/fixtures/CoreDiscovery/*`. From SEMIC: `server/tests/fixtures/shapes/*`. Each has a `PINNED.md` naming the commit and the refresh
@@ -97,8 +113,8 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
 - **A harvested file's format comes from `detect.py`, never from its name or media type.** When
   adding a format, add it to `FORMATS`, add a snippet to `test_detect.py`, and run the detector
   over the real examples in the `converters` repository (a checkout beside this one), which is
-  how its rules were tuned. Recognising a format and converting it are separate: `convert.py`
-  holds what is connected, and today that is CDIF JSON-LD only.
+  how its rules were tuned. Recognising a format and converting it are separate:
+  `converters.CONNECTED` holds what is connected.
 - **A CDIF record is validated against the profile its own catalog record declares**
   (`validate.profile_for`), not against a setting. The source's `profile` setting is only the
   fallback for a record that declares nothing we hold a profile for.

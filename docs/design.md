@@ -95,7 +95,24 @@ The model is the one ckanext-harvest uses, reimplemented.
 
 - **Three stages.** Gather (list what the source holds), fetch (get one record as sent) and import. Each kind of source provides the first two. Import is shared: recognise the format from the content, convert it to CDIF, validate, store.
 - **Format is recognised from content.** File names and media types are not trusted. A CDIF JSON-LD record is recognised by the conformance addresses in its catalog record (`schema:subjectOf`, `dcterms:conformsTo`), and those addresses choose the profile it is validated against. Also recognised: schema.org, DCAT, Croissant, FAIR2, RO-Crate and DDI-CDI JSON-LD; UMM, STAC, DataCite, CKAN, DCAT-US and NIAID JSON; ISO 19139, 19115-2 and 19115-3, CSW responses, FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI 1.2.2, DDI Codebook 2.5, DDI Lifecycle, DDI-CDI, SDMX-ML, OGC capabilities and DCAT RDF/XML; DCAT and schema.org Turtle.
-- **Recognising is not converting.** Only CDIF JSON-LD is taken in today. A record in any other recognised format is stored as received, and the run reports the format and the converter that exists for it in the CDIF `converters` repository. Connecting those converters is the next harvesting step.
+- **Recognising is not converting.** A record in a format with no connected converter is stored as received, and the run reports the format and any converter that exists for it. Once a converter is connected, a retry of the failed records converts them.
+- **Converters come from the CDIF `converters` repository**, a git submodule pinned to a commit. A converted record is given the catalog's own conformance declaration, then checked; it is published only if it passes. The table below is what each connected converter did on its own example files on 19 November 2026.
+
+| Format | Converter | On its examples, against the pinned `CoreDiscovery` profile |
+|---|---|---|
+| ISO 19139, ISO 19115-2, ISO 19115-3, and a CSW response holding one record | `ISO19115/iso_to_cdif.py` | Valid (3 of 3 each). |
+| DDI-CDI XML | `DDI-CDI/ddicdi_to_cdif.py` | Valid (2 of 2). |
+| schema.org JSON-LD | `soso/ConvertFromSOSO.py` | Converts; not valid (3 of 3). For example a funder given as text, and a citation address that is not a web address. |
+| Croissant | `croissant/ConvertFromCroissant.py` | Converts; not valid (3 of 3): `@type` written as one word where the profile wants a list. |
+| RO-Crate | `ROCrate/ROCrateToCDIF.py` | Converts; not valid (3 of 3): file size written as a number where the profile wants text. |
+| NASA UMM-C | `UMM/umm_to_cdif.py` | Converts; not valid (3 of 3): distributions with no download address. |
+| DDI-CDI JSON-LD | `DDI-CDI/ddicdi_jsonld_to_cdif.py` | Converts; not valid (3 of 3): a distribution name that is not text. |
+| FAIR2 | `FAIR2/fair2_to_cdif.py` | Converts; not valid (1 of 1): checksums with no algorithm. Took over a minute. |
+| DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Converts, but to a graph of separate nodes, which the catalog cannot check or store without a framing step. Reported, not stored as CDIF. Slow: 6 to 25 seconds a record. |
+| DCAT (JSON-LD, RDF/XML, Turtle), SDMX-ML | exist | Not connected: each takes one dataset or dataflow picked out of a larger document. |
+| FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI Lifecycle, OGC capabilities, STAC, CKAN, DCAT-US, NIAID | none connected | Recognised and kept as received. NIAID has a harvester script, not a converter function. |
+
+The "not valid" rows are for the `converters` and `metadataBuildingBlocks` repositories to settle: either the converter's output or the profile the catalog pins is behind the other. They are not patched here.
 - **`robots.txt` is obeyed**, including its crawl delay, unless a source's settings say to ignore it. A closed subfolder or file is skipped; a closed starting point fails the run.
 - **Failed records can be retried alone.** A retry run fetches and imports again only the records that ended in an error in an earlier run.
 - **Changed since, only after a clean run.** A source is asked for changes since the last run that finished with no errors. After a run with errors the next asks for everything, so a failure cannot hide a record for good.
@@ -195,6 +212,8 @@ A fixed set of named permissions assigned to groups. A user can belong to more t
 | Admins        | Manage groups, membership and all sources.                                                                                      |
 
 Harvest-edit is its own named permission, so it can be granted to another group later without a code change.
+
+> **Decided:** the converters are brought in as a git submodule for now. For production they should become an installed package; `server/app/harvest/converters.py` is the only module that would change.
 
 > **Decided:** to start, only admins can harvest. Registering sources and running them is one named permission, `harvest`, held by the admins group alone. Data managers get it when harvest sources are scoped to organisations.
 
@@ -339,7 +358,7 @@ If the day 2 inventory shows the stock form is unusable in ways the planned cust
 
 ## Open questions
 
-- How should the converters in the CDIF `converters` repository be brought into the catalog: as a git submodule, an installed package, or pinned copies as with the profile files? They import each other and a `validation` submodule, so copying single files will not do.
+- The catalog checks and stores one nested record. The DDI converters, and CDIF profiles with data description content generally, produce a graph of nodes. Where does framing happen: in the converter, or in the catalog before validation?
 - Which identity provider: ORCID alone, or ORCID plus an institutional login for staff?
 - Where do the SKOS vocabularies live once GeoNetwork is retired?
 

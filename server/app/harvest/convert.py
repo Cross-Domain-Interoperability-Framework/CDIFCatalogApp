@@ -1,15 +1,13 @@
 """Turns a harvested document into a CDIF record, once `detect` has said what it is.
 
-Only CDIF JSON-LD is taken in today: it is CDIF already. Every other recognised format is kept
-as received and reported, naming the converter that exists for it in the CDIF `converters`
-repository, so that connecting that converter later needs no second harvest.
-
-To connect a converter: add its format id to `CONVERTERS` with a function taking the text and
-returning a CDIF record.
+CDIF JSON-LD is CDIF already. The other formats go through the converters in the CDIF
+`converters` repository, connected in `converters.py`. A recognised format with no connected
+converter is kept as received and reported, so that connecting one later needs no second
+harvest: a retry of the failed records converts them from what is stored at the source.
 """
 import json
 
-from app.harvest import HarvestError
+from app.harvest import HarvestError, converters
 from app.harvest.detect import Detected
 
 
@@ -21,15 +19,26 @@ def _cdif(content: str) -> dict:
 
 
 # format id -> function(text) -> CDIF record
-CONVERTERS = {
-    "cdif-jsonld": _cdif,
-}
+CONVERTERS = {"cdif-jsonld": _cdif, **converters.CONNECTED}
 
 
 def to_cdif(detected: Detected, content: str) -> dict:
     convert = CONVERTERS.get(detected.format)
     if convert is not None:
-        return convert(content)
+        try:
+            record = convert(content)
+        except HarvestError:
+            raise
+        except Exception as e:  # the converters are scripts written for well-formed input
+            raise HarvestError(f"Recognised as {detected.label}, but it could not be converted to CDIF: {type(e).__name__}: {e}")
+        if "@graph" in record:
+            # Some converters (DDI) return the dataset with its code lists as separate nodes. The
+            # catalog checks and stores one nested record, and has no framing step to make one.
+            raise HarvestError(
+                f"Recognised as {detected.label} and converted, but the result is a graph of "
+                f"{len(record['@graph'])} nodes, which the catalog cannot check or store yet."
+            )
+        return record
     if detected.format == "json-invalid":
         raise HarvestError(f"The file is not valid JSON: {detected.detail}")
     if detected.format == "xml-invalid":

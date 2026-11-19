@@ -4,6 +4,8 @@ WORKDIR /srv
 COPY requirements.txt requirements-dev.txt pytest.ini ./
 RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY app ./app
+# The CDIF converters, a git submodule: run `git submodule update --init` before building.
+COPY converters ./converters
 COPY tests ./tests
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

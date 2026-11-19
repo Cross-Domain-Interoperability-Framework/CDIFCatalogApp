@@ -179,17 +179,35 @@ def test_a_file_that_is_not_json_is_kept_as_received_and_reported(db):
     assert records(db, source)["broken.json"]["received"] == "{not json"
 
 
-ISO = '<gmd:MD_Metadata xmlns:gmd="http://www.isotc211.org/2005/gmd"><gmd:fileIdentifier/></gmd:MD_Metadata>'
+DCAT_RDF = (
+    '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcat="http://www.w3.org/ns/dcat#">'
+    "<dcat:Dataset/></rdf:RDF>"
+)
+CONVERTERS = Path(__file__).parents[1] / "converters"
 
 
-def test_a_format_other_than_cdif_is_recognised_kept_and_reported_with_its_converter(db):
+def test_a_format_whose_converter_is_not_connected_is_recognised_kept_and_reported(db):
     source = new_source(db)
-    job = harvest(db, source, Folder({"record.xml": ("30-Mar-2024 12:01", ISO), "a.json": ("30-Mar-2024 12:01", MINIMAL)}))
+    job = harvest(db, source, Folder({"record.rdf": ("30-Mar-2024 12:01", DCAT_RDF), "a.json": ("30-Mar-2024 12:01", MINIMAL)}))
     assert job["stats"]["added"] == 1 and job["stats"]["errored"] == 1
     message = job["errors"][0]["message"]
-    assert "ISO 19139 XML" in message and "ISO19115/iso_to_cdif.py" in message
-    kept = records(db, source)["record.xml"]
-    assert kept["received"] == ISO and kept["received_format"] == "iso19139" and kept["status"] == "invalid"
+    assert "DCAT RDF/XML" in message and "DCAT/dcat_to_cdif.py" in message
+    kept = records(db, source)["record.rdf"]
+    assert kept["received"] == DCAT_RDF and kept["received_format"] == "dcat-rdfxml" and kept["status"] == "invalid"
+
+
+def test_an_iso_record_is_converted_checked_and_published_with_the_catalogs_own_claim(db):
+    examples = sorted((CONVERTERS / "ISO19115" / "examples").rglob("*.xml"))
+    assert examples, "server/converters is empty: run `git submodule update --init`"
+    iso = examples[0].read_text(encoding="utf-8")
+    source = new_source(db)
+    job = harvest(db, source, Folder({"record.xml": ("30-Mar-2024 12:01", iso)}))
+    assert job["errors"] == [] and job["stats"]["added"] == 1
+    record = records(db, source)["record.xml"]
+    assert record["received"] == iso and record["received_format"].startswith("iso191")
+    assert record["status"] == "published" and record["validation"]["valid"] is True
+    declared = {c["@id"] for c in record["published"]["schema:subjectOf"]["dcterms:conformsTo"]}
+    assert {"https://w3id.org/cdif/core/2.0", "https://w3id.org/cdif/discovery/2.0"} <= declared
 
 
 def test_what_a_file_is_comes_from_its_content_not_its_name(db):
