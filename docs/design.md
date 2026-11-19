@@ -100,6 +100,8 @@ The model is the one ckanext-harvest uses, reimplemented.
 - **The queue is the job table.** A worker claims a waiting job with a row lock that other workers skip. There is no message broker.
 - **Not built:** email to an organisation's admins when a run fails, because there are no users to send it to until sign-in exists.
 
+> **Decided:** if a source changes a published record into an invalid one, the record stops being served until it is fixed. The earlier valid version is not kept on show.
+
 ## Who submits, and how
 
 ### Domain scientists: a guided form
@@ -174,6 +176,8 @@ A record is offered only in formats its content can honestly fill. The catalog r
 - **A record with no description still goes out as DCAT.** DCAT-AP requires a description and CDIF does not, so the DCAT description is then the title followed by "description missing".
 - **DCAT output loses detail, and says so.** DCAT-AP has no place for variable-level description or data structure. The mapping table states what is dropped, as the existing converters do.
 - **New work.** A CDIF-to-DCAT mapping. The existing DCAT-to-CDIF table is the starting point but runs the other way.
+
+> **Decided:** DCAT output targets DCAT-AP 3.0.0 and GeoDCAT-AP 3.0.0 for now. GeoDCAT-AP 3.1.0 exists, but how widely it is adopted is not known.
 
 ## Groups and permissions
 
@@ -325,7 +329,6 @@ If the day 2 inventory shows the stock form is unusable in ways the planned cust
 
 ## Open questions
 
-- Which DCAT-AP and GeoDCAT-AP versions should the feed target? Built against 3.0.0 of both; GeoDCAT-AP 3.1.0 also exists.
 - Which identity provider: ORCID alone, or ORCID plus an institutional login for staff?
 - Where do the SKOS vocabularies live once GeoNetwork is retired?
 
