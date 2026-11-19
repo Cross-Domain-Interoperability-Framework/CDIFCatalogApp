@@ -1,7 +1,9 @@
 """Harvest runs against a pretend web folder. These need a real PostgreSQL (DATABASE_URL) and
 fail, not skip, without one. No network: the folder is served by an httpx mock transport."""
+import datetime
 import json
 import os
+from email.utils import format_datetime
 from pathlib import Path
 
 import httpx
@@ -25,22 +27,35 @@ class Folder:
     """A web folder whose files and dates a test can change between runs."""
 
     def __init__(self, files):
-        self.files = dict(files)  # name -> (nginx-style date, text)
-        self.fetched = []
+        self.files = dict(files)  # name -> (modified date as "30-Mar-2024 12:01" or None, text)
+        self.fetched = []  # files whose content was downloaded
         self.down = False
+        self.broken = set()  # files that are listed but answer with an error
+        self.robots = None  # the text of /robots.txt, or None for there being none
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if self.down:
             return httpx.Response(503)
         url = str(request.url)
+        if request.url.path == "/robots.txt" and self.robots is not None:
+            return httpx.Response(200, text=self.robots)
         if url == BASE:
-            rows = "".join(f'<a href="{n}">{n}</a>   {d}   10\n' for n, (d, _) in self.files.items())
-            return httpx.Response(200, text=f'<pre><a href="../">../</a>\n{rows}</pre>', headers={"server": "nginx"})
+            rows = "".join(f'<a href="{n}">{n}</a>\n' for n in self.files)
+            return httpx.Response(200, text=f'<pre><a href="../">../</a>\n{rows}</pre>')
         name = url[len(BASE):]
-        if name in self.files:
-            self.fetched.append(name)
-            return httpx.Response(200, text=self.files[name][1])
-        return httpx.Response(404)
+        if name not in self.files:
+            return httpx.Response(404)
+        if name in self.broken:
+            return httpx.Response(500)
+        date, text = self.files[name]
+        headers = {}
+        if date:
+            when = datetime.datetime.strptime(date, "%d-%b-%Y %H:%M").replace(tzinfo=datetime.timezone.utc)
+            headers["last-modified"] = format_datetime(when, usegmt=True)
+        if request.method == "HEAD":
+            return httpx.Response(200, headers=headers)
+        self.fetched.append(name)
+        return httpx.Response(200, text=text, headers=headers)
 
 
 @pytest.fixture
@@ -67,8 +82,10 @@ def new_source(conn, **fields):
     return source
 
 
-def harvest(conn, source, folder):
-    job = conn.execute("INSERT INTO harvest_jobs (source_id) VALUES (%s) RETURNING id", (source["id"],)).fetchone()
+def harvest(conn, source, folder, retry_of=None):
+    job = conn.execute(
+        "INSERT INTO harvest_jobs (source_id, retry_of) VALUES (%s, %s) RETURNING id", (source["id"], retry_of)
+    ).fetchone()
     conn.commit()
     with httpx.Client(transport=httpx.MockTransport(folder)) as http:
         run.run_job(conn, run.claim(conn, job["id"]), http)
@@ -90,11 +107,12 @@ def test_a_first_run_adds_and_publishes_valid_records(db):
     assert job["stats"]["added"] == 2
     a = records(db, source)["a.json"]
     assert a["status"] == "published" and a["labels"] == ["public", "member-org-a"]
-    assert a["received"] == MINIMAL and a["received_format"] == "jsonld"
+    assert a["received"] == MINIMAL and a["received_format"] == "cdif-jsonld"
+    assert a["profile"] == "CoreDiscovery" and "https://w3id.org/cdif/discovery/2.0" in a["validation"]["declared"]
     assert a["published"] == json.loads(MINIMAL) and a["validation"]["valid"] is True
 
 
-def test_an_unchanged_listing_date_means_the_file_is_not_fetched_again(db):
+def test_an_unchanged_modified_date_means_the_file_is_not_fetched_again(db):
     source = new_source(db)
     folder = Folder({"a.json": ("30-Mar-2024 12:01", MINIMAL)})
     harvest(db, source, folder)
@@ -111,6 +129,15 @@ def test_a_newer_date_with_the_same_content_is_fetched_but_not_modified(db):
     folder.files["a.json"] = ("31-Mar-2024 08:00", MINIMAL)
     job = harvest(db, source, folder)
     assert job["stats"]["not modified"] == 1 and job["stats"]["updated"] == 0
+
+
+def test_a_file_with_no_modified_date_is_fetched_each_run_and_recognised_by_its_content(db):
+    source = new_source(db)
+    folder = Folder({"a.json": (None, MINIMAL)})
+    assert harvest(db, source, folder)["stats"]["added"] == 1
+    folder.fetched.clear()
+    job = harvest(db, source, folder)
+    assert job["stats"]["not modified"] == 1 and folder.fetched == ["a.json"]
 
 
 def test_changed_content_updates_the_record(db):
@@ -150,6 +177,88 @@ def test_a_file_that_is_not_json_is_kept_as_received_and_reported(db):
     job = harvest(db, source, Folder({"broken.json": ("30-Mar-2024 12:01", "{not json")}))
     assert job["stats"]["errored"] == 1 and "not valid JSON" in job["errors"][0]["message"]
     assert records(db, source)["broken.json"]["received"] == "{not json"
+
+
+ISO = '<gmd:MD_Metadata xmlns:gmd="http://www.isotc211.org/2005/gmd"><gmd:fileIdentifier/></gmd:MD_Metadata>'
+
+
+def test_a_format_other_than_cdif_is_recognised_kept_and_reported_with_its_converter(db):
+    source = new_source(db)
+    job = harvest(db, source, Folder({"record.xml": ("30-Mar-2024 12:01", ISO), "a.json": ("30-Mar-2024 12:01", MINIMAL)}))
+    assert job["stats"]["added"] == 1 and job["stats"]["errored"] == 1
+    message = job["errors"][0]["message"]
+    assert "ISO 19139 XML" in message and "ISO19115/iso_to_cdif.py" in message
+    kept = records(db, source)["record.xml"]
+    assert kept["received"] == ISO and kept["received_format"] == "iso19139" and kept["status"] == "invalid"
+
+
+def test_what_a_file_is_comes_from_its_content_not_its_name(db):
+    source = new_source(db)
+    harvest(db, source, Folder({"cdif-named-as.xml": ("30-Mar-2024 12:01", MINIMAL)}))
+    record = records(db, source)["cdif-named-as.xml"]
+    assert record["received_format"] == "cdif-jsonld" and record["status"] == "published"
+
+
+def test_robots_txt_is_obeyed_unless_the_source_says_to_ignore_it(db):
+    source = new_source(db)
+    folder = Folder({"a.json": ("30-Mar-2024 12:01", MINIMAL)})
+    folder.robots = "User-agent: *\nDisallow: /records/\n"  # the source's own starting point
+    job = harvest(db, source, folder)
+    assert [e["stage"] for e in job["errors"]] == ["gather"] and "robots.txt" in job["errors"][0]["message"]
+    assert records(db, source) == {} and folder.fetched == []
+    db.execute("UPDATE harvest_sources SET config = %s WHERE id = %s", (psycopg.types.json.Jsonb({"ignore_robots": True}), source["id"]))
+    db.commit()
+    assert harvest(db, source, folder)["stats"]["added"] == 1
+
+
+def test_files_closed_by_robots_txt_are_left_out_and_the_rest_is_harvested(db):
+    source = new_source(db)
+    folder = Folder({"a.json": ("30-Mar-2024 12:01", MINIMAL), "secret.json": ("30-Mar-2024 12:01", COMPLETE)})
+    folder.robots = "User-agent: *\nDisallow: /records/secret.json\n"
+    job = harvest(db, source, folder)
+    assert job["errors"] == [] and job["stats"]["added"] == 1
+    assert list(records(db, source)) == ["a.json"] and folder.fetched == ["a.json"]
+
+
+def test_nothing_is_withdrawn_in_a_run_where_a_file_could_not_be_fetched(db):
+    source = new_source(db)
+    folder = Folder({"a.json": ("30-Mar-2024 12:01", MINIMAL), "b.json": ("30-Mar-2024 12:01", COMPLETE), "c.json": ("30-Mar-2024 12:01", MINIMAL)})
+    harvest(db, source, folder)
+    del folder.files["b.json"]  # gone from the listing
+    folder.files["c.json"] = ("31-Mar-2024 08:00", MINIMAL)
+    folder.broken.add("c.json")  # and another file now fails: the source is misbehaving
+    job = harvest(db, source, folder)
+    assert job["stats"]["errored"] == 1 and job["stats"]["deleted"] == 0
+    assert records(db, source)["b.json"]["status"] == "published"
+    folder.broken.clear()  # once the source is well again, the missing record is withdrawn
+    assert harvest(db, source, folder)["stats"]["deleted"] == 1
+    assert records(db, source)["b.json"]["status"] == "withdrawn"
+
+
+def test_a_retry_looks_again_at_only_the_records_that_failed(db):
+    source = new_source(db)
+    folder = Folder({"a.json": ("30-Mar-2024 12:01", MINIMAL), "bad.json": ("30-Mar-2024 12:01", INVALID), "c.json": ("30-Mar-2024 12:01", COMPLETE)})
+    folder.broken.add("c.json")
+    first = harvest(db, source, folder)
+    assert first["stats"]["added"] == 1 and first["stats"]["errored"] == 2
+    folder.broken.clear()
+    folder.fetched.clear()
+    retry = harvest(db, source, folder, retry_of=first["id"])
+    assert sorted(folder.fetched) == ["bad.json", "c.json"]  # a.json is left alone
+    assert retry["stats"]["added"] == 1 and retry["stats"]["errored"] == 1  # c.json now in; bad.json still invalid
+    assert retry["stats"]["deleted"] == 0 and records(db, source)["a.json"]["status"] == "published"
+
+
+def test_a_retry_does_not_count_as_a_clean_full_run(db):
+    source = new_source(db)
+    folder = Folder({"a.json": ("30-Mar-2024 12:01", MINIMAL)})
+    folder.broken.add("a.json")
+    first = harvest(db, source, folder)
+    folder.broken.clear()
+    retry = harvest(db, source, folder, retry_of=first["id"])
+    assert retry["errors"] == []
+    later = db.execute("INSERT INTO harvest_jobs (source_id) VALUES (%s) RETURNING id", (source["id"],)).fetchone()
+    assert run.last_error_free_start(db, source["id"], later["id"]) is None
 
 
 def test_a_source_that_cannot_be_listed_is_a_gather_error_and_withdraws_nothing(db):
@@ -241,11 +350,12 @@ def test_the_api_registers_a_source_queues_one_run_at_a_time_and_clears(db, as_a
         assert res.status_code == 201
         source = res.json()
         db.sources.append(source["id"])
-        assert source["config"] == {"extensions": [".json", ".jsonld"], "depth": 3}
+        assert source["config"] == {"extensions": [".json", ".jsonld", ".xml", ".ttl", ".rdf"], "depth": 3}
         job = client.post(f"/api/harvest/sources/{source['id']}/jobs")
         assert job.status_code == 201 and job.json()["status"] == "new"
         assert client.post(f"/api/harvest/sources/{source['id']}/jobs").status_code == 409
         assert client.post(f"/api/harvest/jobs/{job.json()['id']}/abort").json() == {"aborted": True}
         read = client.get(f"/api/harvest/jobs/{job.json()['id']}").json()
         assert read["status"] == "aborted" and read["errors"][0]["stage"] == "job"
+        assert client.post(f"/api/harvest/jobs/{job.json()['id']}/retry").status_code == 422  # nothing failed in it
         assert client.post(f"/api/harvest/sources/{source['id']}/clear").json()["jobs_removed"] == 1

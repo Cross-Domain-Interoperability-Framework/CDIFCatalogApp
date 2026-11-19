@@ -117,6 +117,31 @@ def read_job(job_id: UUID) -> dict:
         return {**job, "stats": run.stats(conn, job_id), "errors": errors}
 
 
+@router.post("/jobs/{job_id}/retry", status_code=201)
+def retry_job(job_id: UUID) -> dict:
+    """Queue a run that looks again at only the records that ended in an error in this one.
+    Each is fetched and imported afresh, whether or not its content has changed."""
+    with connect() as conn:
+        job = conn.execute("SELECT source_id, status FROM harvest_jobs WHERE id = %s", (job_id,)).fetchone()
+        if job is None:
+            raise HTTPException(404, "No harvest job with that id.")
+        if job["status"] in ("new", "running"):
+            raise HTTPException(409, "That run has not finished yet.")
+        open_job = conn.execute(
+            "SELECT id FROM harvest_jobs WHERE source_id = %s AND status IN ('new', 'running')", (job["source_id"],)
+        ).fetchone()
+        if open_job:
+            raise HTTPException(409, f"This source already has a run in progress: {open_job['id']}")
+        failed = conn.execute(
+            "SELECT count(*) AS n FROM harvest_objects WHERE job_id = %s AND outcome = 'errored'", (job_id,)
+        ).fetchone()["n"]
+        if failed == 0:
+            raise HTTPException(422, "That run has no failed records to retry.")
+        return conn.execute(
+            "INSERT INTO harvest_jobs (source_id, retry_of) VALUES (%s, %s) RETURNING *", (job["source_id"], job_id)
+        ).fetchone()
+
+
 @router.post("/jobs/{job_id}/abort")
 def abort_job(job_id: UUID) -> dict:
     with connect() as conn:

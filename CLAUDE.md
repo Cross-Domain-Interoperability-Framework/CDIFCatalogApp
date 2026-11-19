@@ -89,11 +89,25 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   a `URIRef`.
 - **Turtle output is not stable text.** Blank nodes come out in a different order each time;
   compare graphs, not strings.
-- **A web folder listing may carry no dates.** Apache without fancy indexing sends a bare list,
-  so every file is fetched on every run and recognised as unchanged only by its content hash.
-- **There is no IIS listing parser.** One was written and removed because no expected source uses
-  IIS; an IIS folder is still harvested, without date skipping. Add a parser only when a real IIS
-  source turns up, and test it against that source.
+- **The web folder harvester does not parse listing layouts.** It takes the links from the page
+  and asks each file for its `Last-Modified` date with a HEAD request, the way Esri's Geoportal
+  harvester does. Do not bring back per-server listing parsers. A server that sends no
+  `Last-Modified` leaves its files undated; they are then fetched each run and recognised by
+  content hash.
+- **A harvested file's format comes from `detect.py`, never from its name or media type.** When
+  adding a format, add it to `FORMATS`, add a snippet to `test_detect.py`, and run the detector
+  over the real examples in the `converters` repository (a checkout beside this one), which is
+  how its rules were tuned. Recognising a format and converting it are separate: `convert.py`
+  holds what is connected, and today that is CDIF JSON-LD only.
+- **A CDIF record is validated against the profile its own catalog record declares**
+  (`validate.profile_for`), not against a setting. The source's `profile` setting is only the
+  fallback for a record that declares nothing we hold a profile for.
+- **`robots.txt` is obeyed by wrapping the HTTP client (`robots.Polite`), so a harvester must use
+  the client it is given** and not open its own. A closed address raises `Disallowed`; a
+  harvester walking a source catches it and skips that address. Only a closed starting point
+  should fail the run.
+- **Records missing from a source are withdrawn at the end of a run, and only if no fetch
+  failed in it.** A retry run never withdraws and never counts as the last clean run.
 - **Git Bash rewrites `/srv/...` arguments into Windows paths.** Prefix a `docker compose exec`
   that passes a container path with `MSYS_NO_PATHCONV=1`.
 - **`web/vite.config.js` is baked into the web image**, not mounted. A proxy change needs the
@@ -107,11 +121,10 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   Read and write files as UTF-8 explicitly; the platform default is cp1252. Shell heredocs
   containing apostrophes fail to parse here: write the file with a tool or a script.
 - **Switching git branches changes the code under the running containers**, because of the mounts.
-- **Sign-in has never completed against ORCID itself.** The tests replace `auth.exchange_code`,
-  so they prove the catalog's half of the round trip only. The scope (`/authenticate`) and the
-  fields read from ORCID's answer (`orcid`, `name`) were written from memory of ORCID's
-  documentation and not checked against it. After the
-  first real sandbox sign-in, delete this entry.
+- **The sign-in tests stand in for ORCID.** They replace `auth.exchange_code`, so they prove the
+  catalog's half of the round trip only. The real exchange worked against the ORCID sandbox on
+  19 November 2026 (scope `/authenticate`; `orcid` and `name` read from the answer). After
+  changing `auth.py`, sign in once for real.
 - **A route that changes anything needs `Depends(auth.require(<permission>))`.** The harvest
   router applies it to every route at once. A test that needs a signed-in user overrides
   `auth.current_user` (see `as_admin` in `test_harvest.py`).

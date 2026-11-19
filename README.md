@@ -24,8 +24,11 @@ What works today:
   rules, lists what it found in plain words with a link to each field, and accepts a submission
   only when nothing is left that must be fixed. Every field has a plain-language label and a line
   of help, and the rules' messages are rewritten in plain words.
-- **Harvesting from web folders:** register a folder of CDIF JSON-LD files, run it by hand or on a
-  schedule, and read what each run added, updated, skipped, withdrew or could not import.
+- **Harvesting from web folders:** register a folder of metadata files, run it by hand or on a
+  schedule, and read what each run added, updated, skipped, withdrew or could not import. Each
+  file's format is recognised from its content. CDIF JSON-LD is taken in and checked against the
+  profiles it declares; other formats are kept as received and reported. The harvester obeys
+  each site's `robots.txt`.
 - **DCAT catalog feed:** published records as DCAT-AP 3 or GeoDCAT-AP 3, in Turtle, JSON-LD or
   RDF/XML, paged the way CKAN's DCAT harvester expects.
 - **Record addresses:** each published record answers as a web page, CDIF JSON-LD, DCAT JSON-LD or
@@ -36,7 +39,8 @@ What works today:
 
 What does not exist yet: ownership of drafts (a draft is tied to the browser it was started in,
 and anyone who knows its address can read it, signed in or not), harvesters for anything but web
-folders, mappings from ISO or DCAT into CDIF, search, CSW, OGC API Records, the sitemap, and any
+folders, connected converters from other formats into CDIF (they exist in the CDIF `converters`
+repository; see `server/app/harvest/convert.py`), search, CSW, OGC API Records, the sitemap, and any
 review step after submission. A submitted record is not published: only harvested records appear
 in the feed. See [Intended scope](#intended-scope).
 
@@ -113,8 +117,11 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `app/store.py` | The `records` table and the harvest tables, the database connection, and the queries more than one module uses. |
 | `app/access.py` | Who may see or edit a record, decided by labels on records and on users; and what each group of users may do. |
 | `app/auth.py` | `/api/auth/…`: sign-in with ORCID, sessions, who the current user is, and the check that guards the harvest API. |
-| `app/harvest/__init__.py` | What every harvester provides: gather, fetch, and mapping to CDIF. |
-| `app/harvest/waf.py` | The web folder harvester, with separate parsers for Apache and nginx directory listings. |
+| `app/harvest/__init__.py` | What every harvester provides: gather and fetch. |
+| `app/harvest/detect.py` | Recognises what a harvested document is from its content: CDIF and other JSON-LD, plain JSON, the XML metadata formats, Turtle. Lists every format and the converter for it. |
+| `app/harvest/convert.py` | Turns a recognised document into CDIF. Only CDIF JSON-LD is connected; this is where a converter is plugged in. |
+| `app/harvest/robots.py` | Obeys a site's `robots.txt`: what may be fetched, and the delay between requests. |
+| `app/harvest/waf.py` | The web folder harvester. It reads a listing page for its links and asks each file for its own modified date. |
 | `app/harvest/run.py` | Runs one job: compares the source with what is stored, records each record's outcome, and writes errors as rows. Also scheduling and time-outs. |
 | `app/harvest/worker.py` | The worker loop: `python -m app.harvest.worker`. |
 | `app/harvest/api.py` | `/api/harvest/…`: register sources, start, stop and read runs. |
@@ -166,12 +173,13 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `GET /api/auth/orcid/login` | Send the browser to ORCID to sign in. ORCID returns it to `/api/auth/orcid/callback`. |
 | `GET /api/auth/me` | Who is signed in, their groups and permissions, and whether sign-in is set up. |
 | `POST /api/auth/logout` | Sign out. |
-| `POST /api/harvest/sources` | Everything under `/api/harvest` needs a signed-in admin. Register a harvest source. Body: `{title, url, type, config?, organisation?, frequency?}`. `type` is `waf`; `frequency` is `MANUAL`, `DAILY`, `WEEKLY`, `BIWEEKLY` or `MONTHLY`. |
+| `POST /api/harvest/sources` | Everything under `/api/harvest` needs a signed-in admin. Register a harvest source. Body: `{title, url, type, config?, organisation?, frequency?}`. `type` is `waf`; `config` may set `extensions`, `depth`, `profile` and `ignore_robots`; `frequency` is `MANUAL`, `DAILY`, `WEEKLY`, `BIWEEKLY` or `MONTHLY`. |
 | `GET /api/harvest/sources`, `GET /api/harvest/sources/{id}` | The sources; one source with its last runs and its record counts. |
 | `POST /api/harvest/sources/{id}/jobs` | Queue a run. Refused while one is in progress. |
 | `POST /api/harvest/sources/{id}/clear` | Remove a source's records and runs, keeping the source. |
 | `GET /api/harvest/jobs/{id}` | A run: its state, counts by outcome, and its errors by stage. |
 | `POST /api/harvest/jobs/{id}/abort` | Stop a run. |
+| `POST /api/harvest/jobs/{id}/retry` | Queue a run that looks again at only the records that failed in this one. |
 | `GET /catalog.{ttl,jsonld,xml}` | The DCAT catalog feed. Parameters: `page`, `modified_since`, `profiles` (`dcat_ap` or `geodcat_ap`). |
 | `GET /records/{id}` | A published record, in the format the `Accept` header asks for, or `?format=` one of `html`, `cdif`, `dcat-jsonld`, `dcat-ttl`. |
 

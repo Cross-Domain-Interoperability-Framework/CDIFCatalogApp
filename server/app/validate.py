@@ -72,6 +72,20 @@ def _conformance_uris(node, inside=False) -> set:
     return found
 
 
+def profile_for(conforms_to, default: str) -> str:
+    """The installed profile to validate a record against, from what its own catalog record says
+    it conforms to: the profile that asks for the most of those addresses, all of which the
+    record declares. A record declaring nothing we hold a profile for gets the default."""
+    declared = set(conforms_to)
+    best, size = default, 0
+    for folder in sorted(PROFILE_DIR.iterdir()):
+        if (folder / "schema.json").is_file():
+            wanted = set(load(folder.name)["conformance"])
+            if wanted and wanted <= declared and len(wanted) > size:
+                best, size = folder.name, len(wanted)
+    return best
+
+
 def strip_empty(value):
     """Remove what the form leaves behind for untouched fields: blank text, empty lists, and
     objects holding nothing but a type marker. Returns None when nothing is left."""

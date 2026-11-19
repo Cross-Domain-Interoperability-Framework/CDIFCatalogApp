@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS harvest_jobs (
     finished         timestamptz
 );
 
+ALTER TABLE harvest_jobs ADD COLUMN IF NOT EXISTS retry_of uuid REFERENCES harvest_jobs(id) ON DELETE SET NULL;
+
 CREATE TABLE IF NOT EXISTS harvest_objects (
     id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     job_id       uuid NOT NULL REFERENCES harvest_jobs(id) ON DELETE CASCADE,

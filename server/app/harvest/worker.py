@@ -13,9 +13,9 @@ from psycopg.rows import dict_row
 
 from app import store
 from app.harvest import run
+from app.harvest.run import USER_AGENT
 
 log = logging.getLogger("harvest")
-USER_AGENT = "CDIFCatalogApp-harvester"
 
 
 def http_client() -> httpx.Client:

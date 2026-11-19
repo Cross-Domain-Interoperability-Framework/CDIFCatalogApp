@@ -93,9 +93,13 @@ The model is the one ckanext-harvest uses, reimplemented.
 | `harvest_objects` | One source record seen in one run | The record's identifier at the source, the source's modified date, and how it ended: added, updated, not modified, deleted or errored. |
 | `harvest_errors` | One failure | The run, the record if there was one, the stage (gather, fetch, import or job) and the message. |
 
-- **Three stages.** Every kind of source provides gather (list what it holds), fetch (get one record as sent) and a mapping to CDIF. The runner does everything else.
+- **Three stages.** Gather (list what the source holds), fetch (get one record as sent) and import. Each kind of source provides the first two. Import is shared: recognise the format from the content, convert it to CDIF, validate, store.
+- **Format is recognised from content.** File names and media types are not trusted. A CDIF JSON-LD record is recognised by the conformance addresses in its catalog record (`schema:subjectOf`, `dcterms:conformsTo`), and those addresses choose the profile it is validated against. Also recognised: schema.org, DCAT, Croissant, FAIR2, RO-Crate and DDI-CDI JSON-LD; UMM, STAC, DataCite, CKAN, DCAT-US and NIAID JSON; ISO 19139, 19115-2 and 19115-3, CSW responses, FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI 1.2.2, DDI Codebook 2.5, DDI Lifecycle, DDI-CDI, SDMX-ML, OGC capabilities and DCAT RDF/XML; DCAT and schema.org Turtle.
+- **Recognising is not converting.** Only CDIF JSON-LD is taken in today. A record in any other recognised format is stored as received, and the run reports the format and the converter that exists for it in the CDIF `converters` repository. Connecting those converters is the next harvesting step.
+- **`robots.txt` is obeyed**, including its crawl delay, unless a source's settings say to ignore it. A closed subfolder or file is skipped; a closed starting point fails the run.
+- **Failed records can be retried alone.** A retry run fetches and imports again only the records that ended in an error in an earlier run.
 - **Changed since, only after a clean run.** A source is asked for changes since the last run that finished with no errors. After a run with errors the next asks for everything, so a failure cannot hide a record for good.
-- **Deletion needs a complete listing.** A record missing from a full listing is withdrawn. A "changed since" listing says nothing about what it leaves out.
+- **Deletion needs a complete listing and a trouble-free run.** A record missing from a full listing is withdrawn, at the end of the run and only if every listed record could be fetched. A "changed since" listing says nothing about what it leaves out, and a source that is failing requests cannot be trusted about what it lists.
 - **Invalid records are stored, not published.** The text as received is kept, the problem is an error row, and the record is not served.
 - **The queue is the job table.** A worker claims a waiting job with a row lock that other workers skip. There is no message broker.
 - **Not built:** email to an organisation's admins when a run fails, because there are no users to send it to until sign-in exists.
@@ -249,12 +253,14 @@ CKAN is not the base for this catalog (see Alternatives considered), but a revie
 
 All six were built on 19 November 2026, each as a first version. What each still lacks is in the last column.
 
+Esri's Geoportal harvester (Apache-2.0) was reviewed the same day. Its web folder approach replaced CKAN's here. Four more of its practices were then built: obeying a site's `robots.txt` and crawl delay, a retry of only the records that failed in a run, no withdrawal of missing records in a run that had fetch failures, and recognising a metadata format from its content instead of its file extension.
+
 | To do | Detail | Belongs to step | Built, and what is missing |
 |---|---|---|---|
 | **Test DCAT output against the official shapes** | Serialise records as DCAT-AP and GeoDCAT-AP, then run pyshacl against the SHACL shapes published by SEMIC. Fetch the shapes from SEMIC and pin them, as the CDIF schema and rules are pinned. | 5 | Built for DCAT-AP 3.0.0 and GeoDCAT-AP 3.0.0, on the three example records. |
 | **DCAT catalog feed with the interface CKAN uses** | `/catalog.{ttl,jsonld,xml}` with `page`, `modified_since` and `profiles=` parameters, and Hydra paging triples (`hydra:PagedCollection` with first, next, last and total). Existing DCAT harvesters, CKAN's included, already walk this. | 5 | Built. Not yet walked by a real CKAN harvester. Lists harvested records only. |
 | **Record address answers by `Accept` header** | The record address serves HTML, CDIF JSON-LD, DCAT JSON-LD or DCAT Turtle according to the request's `Accept` header, and the HTML page advertises the others with `<link rel="alternate">`. | 3 and 5 | Built. The web page is a plain summary, not the designed record page. |
-| **Web folder listings: a parser per server** | Apache, nginx and IIS directory listings differ. Parse each separately, choosing by the response's `Server` header, and take the modified date from the listing to skip unchanged files. | 2 | Built for Apache and nginx, for folders of CDIF JSON-LD, and checked live against both. IIS is set aside: no expected source uses it. An IIS folder is still harvested, without date skipping. |
+| **Web folder harvesting** | CKAN parses Apache, nginx and IIS listings separately, chosen by the `Server` header, and reads dates from the listing. | 2 | Built that way first, then replaced on the same day with the approach of Esri's Geoportal harvester: read only the links from the listing, and ask each file for its own `Last-Modified` date. It needs no per-server code and works where a listing shows no dates. Checked live against nginx and Apache, for folders of CDIF JSON-LD. |
 | **Organisation-scoped access by labels** | Each record carries labels (`public`, `member-<organisation>`, `creator-<user>`), each user carries labels, and search and edit checks filter on the overlap. This is how the data managers' organisation-scoped harvest-edit permission is built. | 3 and 6 | Labels and the checks are built and the feed uses them. Users can sign in, but none is yet given an organisation, so only `public` records are seen. |
 | **Plain-language labels and help text** | Write a label and one line of help for every form field, and rewrite the SHACL rule messages shown in the validation report. CKAN's DCAT-AP form schemas are reference wording only; the text here is our own. | 7, and the report before the scientist sessions | Built for `CoreDiscovery`: 65 fields and 122 rule messages. Not yet read by a scientist. |
 
@@ -333,6 +339,7 @@ If the day 2 inventory shows the stock form is unusable in ways the planned cust
 
 ## Open questions
 
+- How should the converters in the CDIF `converters` repository be brought into the catalog: as a git submodule, an installed package, or pinned copies as with the profile files? They import each other and a `validation` submodule, so copying single files will not do.
 - Which identity provider: ORCID alone, or ORCID plus an institutional login for staff?
 - Where do the SKOS vocabularies live once GeoNetwork is retired?
 

@@ -1,20 +1,27 @@
 """Harvesting: what every kind of source has to provide.
 
-A harvester works in three stages, the split ckanext-harvest uses:
+A harvest works in three stages, the split ckanext-harvest uses:
 
   gather   list what the source holds, without fetching it
   fetch    get one record as the source sends it
-  import   map that record to CDIF (`to_cdif`); the runner then validates and stores it
+  import   recognise what it is, convert it to CDIF, validate it and store it
 
-The runner (`run.py`) owns everything the stages share: comparing against what is stored,
-recording each record's outcome, and writing errors as rows.
+A harvester provides the first two, which differ by kind of source. The third is the same for
+every source: `detect.py` recognises the format from the content, `convert.py` turns it into
+CDIF, and the runner (`run.py`) validates and stores it. The runner also owns what the stages
+share: comparing against what is stored, recording each record's outcome, and writing errors as
+rows.
 """
-import json
 from dataclasses import dataclass, field
 
 
 class HarvestError(Exception):
     """A problem to report against the job or the object, in words a data manager can act on."""
+
+
+class Disallowed(HarvestError):
+    """The site's robots.txt closes this address to us. A harvester walking a source skips such
+    an address and carries on; it is an error only when it is the source's own starting point."""
 
 
 @dataclass
@@ -35,7 +42,7 @@ class Gathered:
 @dataclass
 class Fetched:
     content: str
-    format: str  # "jsonld", "iso19139", "iso19115-3", ...
+    content_type: str | None = None  # the media type the source gave, if any; a hint only
 
 
 class Harvester:
@@ -51,20 +58,6 @@ class Harvester:
 
     def fetch(self, source: dict, item: Item, http) -> Fetched:
         raise NotImplementedError
-
-    def to_cdif(self, fetched: Fetched) -> dict:
-        """Map a fetched record to CDIF. JSON-LD is taken as CDIF already; the mappings for other
-        formats (ISO, DCAT) are not built yet, so those records are kept as received and
-        reported, not dropped."""
-        if fetched.format != "jsonld":
-            raise HarvestError(f"There is no mapping to CDIF for the format '{fetched.format}' yet.")
-        try:
-            record = json.loads(fetched.content)
-        except ValueError as e:
-            raise HarvestError(f"The file is not valid JSON: {e}")
-        if not isinstance(record, dict):
-            raise HarvestError("The file does not hold a single record.")
-        return record
 
 
 def harvesters() -> dict:

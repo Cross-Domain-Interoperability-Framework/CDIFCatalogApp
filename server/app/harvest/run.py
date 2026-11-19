@@ -7,9 +7,13 @@ Work is committed record by record, so a run can be watched, and aborted between
 from psycopg.types.json import Jsonb
 
 from app import access, store, validate
-from app.harvest import HarvestError, Item, harvesters
+from app.harvest import HarvestError, Item, convert, harvesters
+from app.harvest.detect import detect
+from app.harvest.robots import Polite
 
 DEFAULT_PROFILE = "CoreDiscovery"
+# Sent with every request, and the name a site's robots.txt rules are matched against.
+USER_AGENT = "CDIFCatalogApp-harvester"
 
 # How often a scheduled source runs. MANUAL sources run only when asked.
 FREQUENCIES = {"MANUAL": None, "DAILY": "1 day", "WEEKLY": "7 days", "BIWEEKLY": "14 days", "MONTHLY": "1 month"}
@@ -36,6 +40,7 @@ def last_error_free_start(conn, source_id, not_job):
     row = conn.execute(
         "SELECT gather_started FROM harvest_jobs j "
         "WHERE source_id = %s AND id <> %s AND status = 'finished' AND gather_started IS NOT NULL "
+        "AND retry_of IS NULL "  # a retry looks at a few records only, so it proves nothing about the rest
         "AND NOT EXISTS (SELECT 1 FROM harvest_errors e WHERE e.job_id = j.id) "
         "ORDER BY gather_started DESC LIMIT 1",
         (source_id, not_job),
@@ -80,19 +85,64 @@ def run_job(conn, job: dict, http) -> None:
     job_id = job["id"]
     source = conn.execute("SELECT * FROM harvest_sources WHERE id = %s", (job["source_id"],)).fetchone()
     harvester = harvesters().get(source["type"])
+    retrying = job.get("retry_of") is not None
+    missing = []  # records the source no longer lists
 
     # ---- gather: what does the source hold? ----
     try:
         if harvester is None:
             raise HarvestError(f"No harvester is installed for the source type '{source['type']}'.")
         source = {**source, "config": harvester.validate_config(source["config"] or {})}
-        since = last_error_free_start(conn, source["id"], job_id)
-        gathered = harvester.gather(source, since, http)
+        if not source["config"].get("ignore_robots"):
+            http = Polite(http, USER_AGENT)
+        if retrying:
+            _gather_failures(conn, job)
+        else:
+            since = last_error_free_start(conn, source["id"], job_id)
+            gathered = harvester.gather(source, since, http)
+            missing = _record_gathered(conn, job_id, source, gathered)
     except Exception as e:  # a source can fail in ways no harvester foresaw; record it, never crash
+        conn.rollback()
         _error(conn, job_id, None, "gather", e)
         _finish(conn, job_id)
         return
+    conn.execute("UPDATE harvest_jobs SET gather_finished = now() WHERE id = %s", (job_id,))
+    conn.commit()
 
+    # ---- fetch and import, one record at a time ----
+    waiting = conn.execute(
+        "SELECT * FROM harvest_objects WHERE job_id = %s AND state = 'waiting' ORDER BY identifier", (job_id,)
+    ).fetchall()
+    for obj in waiting:
+        status = conn.execute("SELECT status FROM harvest_jobs WHERE id = %s", (job_id,)).fetchone()["status"]
+        if status != "running":  # aborted while running
+            return
+        _harvest_one(conn, harvester, source, obj, http, force=retrying)
+        conn.commit()
+
+    # ---- withdraw what the source no longer lists ----
+    # Only after a run in which every listed record could be fetched. If the source was
+    # misbehaving, its listing is not to be trusted either, and a record wrongly withdrawn is
+    # worse than one withdrawn a run late. (Esri's Geoportal harvester has the same rule.)
+    if missing:
+        trouble = conn.execute(
+            "SELECT count(*) AS n FROM harvest_errors WHERE job_id = %s AND stage = 'fetch'", (job_id,)
+        ).fetchone()["n"]
+        if trouble == 0:
+            for record_id, identifier in missing:
+                obj = conn.execute(
+                    "INSERT INTO harvest_objects (job_id, source_id, identifier) VALUES (%s, %s, %s) RETURNING *",
+                    (job_id, source["id"], identifier),
+                ).fetchone()
+                store.set_status(conn, record_id, "withdrawn")
+                _close(conn, obj, "deleted", record_id)
+    _finish(conn, job_id)
+
+
+def _record_gathered(conn, job_id, source: dict, gathered) -> list:
+    """Write an object for everything the source listed, closing at once those whose own
+    modified date has not moved. Returns (record id, identifier) for stored records the source
+    no longer lists, when its listing was complete."""
     stored = {
         r["source_identifier"]: r
         for r in conn.execute(
@@ -119,33 +169,25 @@ def run_job(conn, job: dict, http) -> None:
         if unchanged:
             conn.execute("UPDATE records SET last_harvested = now() WHERE id = %s", (known["id"],))
             _close(conn, obj, "not modified", known["id"])
-
-    if gathered.complete:
-        for identifier, known in stored.items():
-            if identifier not in seen and known["status"] != "withdrawn":
-                obj = conn.execute(
-                    "INSERT INTO harvest_objects (job_id, source_id, identifier) VALUES (%s, %s, %s) RETURNING *",
-                    (job_id, source["id"], identifier),
-                ).fetchone()
-                store.set_status(conn, known["id"], "withdrawn")
-                _close(conn, obj, "deleted", known["id"])
-    conn.execute("UPDATE harvest_jobs SET gather_finished = now() WHERE id = %s", (job_id,))
-    conn.commit()
-
-    # ---- fetch and import, one record at a time ----
-    waiting = conn.execute(
-        "SELECT * FROM harvest_objects WHERE job_id = %s AND state = 'waiting' ORDER BY identifier", (job_id,)
-    ).fetchall()
-    for obj in waiting:
-        status = conn.execute("SELECT status FROM harvest_jobs WHERE id = %s", (job_id,)).fetchone()["status"]
-        if status != "running":  # aborted while running
-            return
-        _harvest_one(conn, harvester, source, obj, http)
-        conn.commit()
-    _finish(conn, job_id)
+    if not gathered.complete:
+        return []
+    return [
+        (known["id"], identifier) for identifier, known in stored.items()
+        if identifier not in seen and known["status"] != "withdrawn"
+    ]
 
 
-def _harvest_one(conn, harvester, source: dict, obj: dict, http) -> None:
+def _gather_failures(conn, job: dict) -> None:
+    """For a retry: queue again only the records that ended in an error in the earlier run."""
+    conn.execute(
+        "INSERT INTO harvest_objects (job_id, source_id, identifier, url, modified) "
+        "SELECT %s, source_id, identifier, url, modified FROM harvest_objects "
+        "WHERE job_id = %s AND outcome = 'errored'",
+        (job["id"], job["retry_of"]),
+    )
+
+
+def _harvest_one(conn, harvester, source: dict, obj: dict, http, force: bool = False) -> None:
     job_id = obj["job_id"]
     item = Item(obj["identifier"], obj["url"], obj["modified"])
     try:
@@ -159,7 +201,8 @@ def _harvest_one(conn, harvester, source: dict, obj: dict, http) -> None:
         "SELECT * FROM records WHERE source_id = %s AND source_identifier = %s", (source["id"], item.identifier)
     ).fetchone()
     digest = store.content_hash(fetched.content)
-    if known and known["content_hash"] == digest and known["status"] != "withdrawn":
+    # Unchanged content needs no second look, except on a retry, which exists to look again.
+    if known and known["content_hash"] == digest and known["status"] != "withdrawn" and not force:
         conn.execute(
             "UPDATE records SET last_harvested = now(), source_modified = %s WHERE id = %s",
             (item.modified, known["id"]),
@@ -167,12 +210,14 @@ def _harvest_one(conn, harvester, source: dict, obj: dict, http) -> None:
         _close(conn, obj, "not modified", known["id"])
         return
 
-    profile = source["config"].get("profile", DEFAULT_PROFILE)
+    detected = detect(fetched.content, fetched.content_type, item.url)
+    # A CDIF record says which profiles it follows; that, not a setting, picks what it is checked against.
+    profile = validate.profile_for(detected.conforms_to, source["config"].get("profile", DEFAULT_PROFILE))
     overlay = known["overlay"] if known else {}
     cdif = published = report = None
     problem = None
     try:
-        cdif = harvester.to_cdif(fetched)
+        cdif = convert.to_cdif(detected, fetched.content)
         conflicts = store.overlay_conflicts(known["source_cdif"] if known else None, cdif, overlay)
         if conflicts:
             # Changed at the source in a property a data manager has overridden: keep what is
@@ -183,6 +228,7 @@ def _harvest_one(conn, harvester, source: dict, obj: dict, http) -> None:
             published = store.apply_overlay(cdif, overlay)
             report = validate.check_record(profile, published)
             report = {k: report[k] for k in ("valid", "counts", "findings")}
+            report["declared"] = list(detected.conforms_to)
             status = "published" if report["valid"] else "invalid"
             if not report["valid"]:
                 n = report["counts"]["violation"]
@@ -197,13 +243,13 @@ def _harvest_one(conn, harvester, source: dict, obj: dict, http) -> None:
 
     labels = access.record_labels(status, source["organisation"])
     values = (
-        fetched.content, fetched.format, Jsonb(cdif), Jsonb(published), Jsonb(report), digest,
-        item.modified, status, labels,
+        fetched.content, detected.format, Jsonb(cdif), Jsonb(published), Jsonb(report), digest,
+        item.modified, status, labels, profile,
     )
     if known:
         conn.execute(
             "UPDATE records SET received = %s, received_format = %s, source_cdif = %s, published = %s, "
-            "validation = %s, content_hash = %s, source_modified = %s, status = %s, labels = %s, "
+            "validation = %s, content_hash = %s, source_modified = %s, status = %s, labels = %s, profile = %s, "
             "last_harvested = now(), changed_at = now() WHERE id = %s",
             values + (known["id"],),
         )
@@ -214,7 +260,7 @@ def _harvest_one(conn, harvester, source: dict, obj: dict, http) -> None:
             "source_modified, status, labels, profile, source_id, source_identifier, organisation, "
             "first_harvested, last_harvested) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now(), now()) RETURNING id",
-            values + (profile, source["id"], item.identifier, source["organisation"]),
+            values + (source["id"], item.identifier, source["organisation"]),
         ).fetchone()["id"]
 
     if problem is not None:

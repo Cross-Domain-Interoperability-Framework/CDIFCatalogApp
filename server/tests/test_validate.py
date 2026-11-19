@@ -137,6 +137,14 @@ def test_endpoint():
     assert client.post("/api/validate", json={"profile": "Nope", "document": {}}).status_code == 422
 
 
+def test_the_profile_to_check_against_follows_what_the_record_declares():
+    core, discovery = "https://w3id.org/cdif/core/2.0", "https://w3id.org/cdif/discovery/2.0"
+    assert set(validate.load("CoreDiscovery")["conformance"]) == {core, discovery}
+    assert validate.profile_for([core, discovery, "https://w3id.org/cdif/data_description/2.0"], "Fallback") == "CoreDiscovery"
+    assert validate.profile_for([core], "Fallback") == "Fallback"  # declares less than the profile asks
+    assert validate.profile_for([], "Fallback") == "Fallback"
+
+
 def rule_messages(profile):
     sh = validate.SH
     return {" ".join(str(o).split()) for o in validate.load(profile)["shapes"].objects(None, sh.message)}
