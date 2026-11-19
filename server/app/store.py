@@ -14,6 +14,23 @@ from psycopg.rows import dict_row
 from app import access
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    orcid          text NOT NULL UNIQUE,
+    name           text,
+    groups         text[] NOT NULL DEFAULT '{}',
+    organisations  text[] NOT NULL DEFAULT '{}',
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    last_login     timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash  text PRIMARY KEY,
+    user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  timestamptz NOT NULL DEFAULT now(),
+    expires_at  timestamptz NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS harvest_sources (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     title         text NOT NULL,

@@ -10,7 +10,7 @@ Check those pages if a step no longer matches what you see.
 | Find an organisation | ROR | No |
 | Fill the form from a DOI | DataCite, then Crossref | No. It reads public records. |
 | Find a person by name or iD | ORCID public search | Works without one today. ORCID's documentation says credentials are required, so register a client before anyone outside the team uses this. |
-| Sign in with ORCID (not built yet) | ORCID | Yes: a Public API client. |
+| Sign in with ORCID, which harvesting requires | ORCID | Yes: a Public API client. |
 | Mint DOIs for records (not in the design) | DataCite | Yes: a DataCite member or repository account. |
 
 So the only setup needed for the next step of the prototype is the ORCID sandbox client.
@@ -26,7 +26,8 @@ Source: [Sandbox testing server](https://info.orcid.org/documentation/integratio
 
 1. Go to https://sandbox.orcid.org/register and register. This is a new account; your real ORCID
    sign-in does not work here.
-2. Verify the email address. Developer Tools stay locked until you do.
+2. Verify the email address. Developer Tools stay locked until you do: the terms-of-service
+   tick box and the **Register for your ORCID Public API credentials** button are greyed out.
 
    **Check this before you register:** as far as we recall, the sandbox only delivers email to
    `@mailinator.com` addresses, which are public throwaway inboxes read at https://www.mailinator.com.
@@ -45,11 +46,19 @@ Source: [Sandbox testing server](https://info.orcid.org/documentation/integratio
    - **Description:** for example, "Prototype catalog for CDIF metadata. Uses your ORCID iD to
      sign you in and attach your records to you."
 5. Add the redirect URI. This is where ORCID sends the user back after they approve.
-   - For a developer machine: `http://localhost:5173/api/auth/orcid/callback`
+   - For a developer machine: `http://127.0.0.1:5173/api/auth/orcid/callback`
+
+     Not `localhost`: ORCID's form answers "Invalid redirect URL" to an address containing
+     `localhost` (seen 19 November 2026). `127.0.0.1` is the same machine by number.
    - For the test sessions, add the HTTPS address of the test server with the same path.
 
-   The address must match exactly, including the port and path. The path above is the one the
-   sign-in code will use; that code is not written yet, so treat it as agreed in advance.
+   The address must match exactly, including the port and path. It is the catalog's own address
+   (`PUBLIC_URL`) followed by `/api/auth/orcid/callback`.
+
+   An account has one Public API client, and one client can list several redirect URIs. If the
+   account already has a client for another application, add this address to it and use the same
+   credentials here, accepting that both applications then show the same name on ORCID's
+   permission screen.
 6. Click **Save my application and generate my client ID and secret**.
 
 Developer Tools now shows a **Client ID** (looks like `APP-XXXXXXXXXXXXXXXX`) and a **Client secret**.
@@ -66,17 +75,25 @@ committed.
 
 ```
 ORCID_BASE=https://sandbox.orcid.org
-ORCID_API_BASE=https://pub.sandbox.orcid.org
 ORCID_CLIENT_ID=APP-XXXXXXXXXXXXXXXX
 ORCID_CLIENT_SECRET=paste-the-secret-here
+ADMIN_ORCIDS=0000-0000-0000-0000
 ```
+
+`ADMIN_ORCIDS` lists the ORCID iDs of the people who are admins, separated by commas. Use sandbox
+iDs with the sandbox. A person named there becomes an admin the next time they sign in. Only
+admins can register and run harvest sources.
+
+Then restart the server so it reads the file: `docker compose up -d api worker`.
 
 Treat the secret like a password: do not put it in chat, email, an issue or a commit.
 
-Today the application reads only `ORCID_API_BASE`, which switches person search to the sandbox.
-The other three are for sign-in and will be read once that is built. Note that the sandbox holds
-only test people, so with `ORCID_API_BASE` set, searching for a real researcher finds nothing.
-Leave it unset to keep searching real ORCID records while testing sign-in against the sandbox.
+A fifth setting, `ORCID_API_BASE=https://pub.sandbox.orcid.org`, switches the author search to
+the sandbox. The sandbox holds only test people, so with it set, searching for a real researcher
+finds nothing. Leave it out to keep searching real ORCID records while signing in through the
+sandbox.
+
+Treat the first sign-in as a test of the code: it has only ever run against a stand-in for ORCID.
 
 ### 4. Make test users
 

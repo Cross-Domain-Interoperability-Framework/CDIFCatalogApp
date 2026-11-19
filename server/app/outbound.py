@@ -15,7 +15,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
-from app import access, dcat, store
+from app import access, auth, dcat, store
 
 router = APIRouter()
 PER_PAGE = 100
@@ -74,7 +74,7 @@ def catalog(
     page: int = 1,
     modified_since: str | None = None,
     profiles: str | None = None,
-    user: access.User = Depends(access.current_user),
+    user: access.User = Depends(auth.current_user),
 ) -> Response:
     if fmt not in dcat.FORMATS:
         raise HTTPException(404, f"The catalog is offered as: {', '.join(dcat.FORMATS)}.")
@@ -149,7 +149,7 @@ def record(
     request: Request,
     format: str | None = None,
     profiles: str | None = None,
-    user: access.User = Depends(access.current_user),
+    user: access.User = Depends(auth.current_user),
 ) -> Response:
     if format is not None and format not in RECORD_FORMATS:
         raise HTTPException(422, f"Unknown format: {format}. Known: {', '.join(RECORD_FORMATS)}.")

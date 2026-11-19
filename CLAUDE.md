@@ -15,7 +15,8 @@ This file covers only the commands and the traps.
 An early prototype. Built: the `CoreDiscovery` submission form (draft saving, ORCID/ROR pickers,
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
 web folders with a worker; the DCAT catalog feed; record addresses with content negotiation; and
-label-based access. Not built: sign-in, the dry run and scientist sessions (plan days 9 and 10),
+label-based access; and sign-in with ORCID, with an admin-only harvest API. Not built: ownership
+of drafts, the dry run and scientist sessions (plan days 9 and 10),
 other harvesters, mappings into CDIF, publishing of submitted records, search, CSW, OGC API
 Records and the sitemap. Do not start those without being asked.
 
@@ -24,7 +25,7 @@ Records and the sitemap. Do not start those without being asked.
 Everything runs in Docker. There is no local Python or Node setup to rely on.
 
 ```bash
-docker compose up --build            # db, api (8000), worker, web (5173); open http://localhost:5173
+docker compose up --build            # db, api (8000), worker, web (5173); open http://127.0.0.1:5173
 docker compose exec api pytest       # server tests; they need the database, so run them here
 docker compose up -d --build api worker   # after changing server/requirements*.txt
 docker compose up -d --build web     # after changing web/vite.config.js or package.json
@@ -106,7 +107,20 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   Read and write files as UTF-8 explicitly; the platform default is cp1252. Shell heredocs
   containing apostrophes fail to parse here: write the file with a tool or a script.
 - **Switching git branches changes the code under the running containers**, because of the mounts.
-- **Drafts have no owner yet, and the harvest API is open.** Anyone with a draft's id can read and
-  change it, and anyone who can reach the server can make it fetch an address by registering a
-  source. Acceptable only on a developer machine; sign-in is the next server step and needs the ORCID sandbox client from
-  `docs/setup-sandboxes.md`.
+- **Sign-in has never completed against ORCID itself.** The tests replace `auth.exchange_code`,
+  so they prove the catalog's half of the round trip only. The scope (`/authenticate`) and the
+  fields read from ORCID's answer (`orcid`, `name`) were written from memory of ORCID's
+  documentation and not checked against it. After the
+  first real sandbox sign-in, delete this entry.
+- **A route that changes anything needs `Depends(auth.require(<permission>))`.** The harvest
+  router applies it to every route at once. A test that needs a signed-in user overrides
+  `auth.current_user` (see `as_admin` in `test_harvest.py`).
+- **`ADMIN_ORCIDS` only ever adds the admins group, at sign-in.** Removing an iD from the setting
+  does not demote anyone; that is an edit to `users.groups` in the database.
+- **ORCID refuses a return address containing `localhost`.** `PUBLIC_URL` therefore defaults to
+  `http://127.0.0.1:5173`, and the page's sign-in link always points there (`sign_in_url` from
+  `/api/auth/me`). Do not compare the request's `Host` header with `PUBLIC_URL` on the server:
+  the Vite proxy rewrites it to `api:8000`, and a redirect built on that comparison loops. A draft started under one name is not found under the other, because the browser keeps
+  each name's storage apart.
+- **Drafts have no owner yet.** Anyone with a draft's id can read and change it, signed in or
+  not. Acceptable only on a developer machine; tying drafts to the signed-in user is the next server step.

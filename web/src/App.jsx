@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
+import Account from './Account.jsx';
 import DoiPrefill from './DoiPrefill.jsx';
 import Report, { fieldIndex } from './Report.jsx';
 import { customRenderers } from './renderers.jsx';
@@ -204,6 +205,9 @@ export default function App() {
   return (
     <Container maxWidth="md" sx={{ py: 3 }}>
       <CssBaseline />
+      <Stack direction="row" sx={{ justifyContent: 'flex-end', minHeight: 32 }}>
+        <Account />
+      </Stack>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
         <Typography variant="h5" component="h1">Submit a dataset record</Typography>
         <Button onClick={startNew} disabled={saveState.kind === 'new'}>Start a new record</Button>

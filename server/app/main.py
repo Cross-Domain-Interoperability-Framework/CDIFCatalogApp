@@ -7,7 +7,7 @@ from fastapi import FastAPI, HTTPException
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
-from app import lookup, outbound, store, validate
+from app import auth, lookup, outbound, store, validate
 from app.harvest import api as harvest_api
 from app.store import connect
 
@@ -43,6 +43,7 @@ app.include_router(lookup.router)
 app.include_router(validate.router)
 app.include_router(harvest_api.router)
 app.include_router(outbound.router)
+app.include_router(auth.router)
 
 
 def database_status() -> str:

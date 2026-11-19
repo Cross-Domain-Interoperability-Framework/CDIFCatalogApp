@@ -19,8 +19,10 @@ services:
     build: ./server
     environment:
       DATABASE_URL: postgresql://catalog:catalog-dev@db:5432/catalog
-      # The address written into the catalog feed and record pages: the one a browser uses.
-      PUBLIC_URL: http://localhost:5173
+      # The address written into the catalog feed and record pages, and the one ORCID sends
+      # people back to after sign-in. 127.0.0.1, not localhost: ORCID refuses a return address
+      # containing "localhost". Set PUBLIC_URL in .env to change it.
+      PUBLIC_URL: ${PUBLIC_URL:-http://127.0.0.1:5173}
     # Optional settings such as ORCID_API_BASE; see docs/setup-sandboxes.md.
     env_file:
       - path: .env

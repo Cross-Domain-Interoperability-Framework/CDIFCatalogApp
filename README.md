@@ -31,8 +31,11 @@ What works today:
 - **Record addresses:** each published record answers as a web page, CDIF JSON-LD, DCAT JSON-LD or
   DCAT Turtle, chosen by the request's `Accept` header.
 
-What does not exist yet: sign-in (a draft is tied to the browser it was started in, anyone who
-knows its address can read it, and the harvest API is open), harvesters for anything but web
+- **Sign-in with ORCID:** the catalog stores no passwords. Admins are named by ORCID iD in a
+  setting, and only admins can use the harvest API.
+
+What does not exist yet: ownership of drafts (a draft is tied to the browser it was started in,
+and anyone who knows its address can read it, signed in or not), harvesters for anything but web
 folders, mappings from ISO or DCAT into CDIF, search, CSW, OGC API Records, the sitemap, and any
 review step after submission. A submitted record is not published: only harvested records appear
 in the feed. See [Intended scope](#intended-scope).
@@ -45,7 +48,7 @@ Requires Docker.
 docker compose up --build
 ```
 
-Then open http://localhost:5173. Stop it with `docker compose down`.
+Then open http://127.0.0.1:5173 (not `localhost`, which ORCID sign-in cannot return to). Stop it with `docker compose down`.
 
 Run the server tests in the running container, because they need the database:
 
@@ -53,8 +56,8 @@ Run the server tests in the running container, because they need the database:
 docker compose exec api pytest
 ```
 
-No accounts are needed to run it. Setting up an ORCID test client, needed later for sign-in, is
-described in [docs/setup-sandboxes.md](docs/setup-sandboxes.md).
+No accounts are needed to run the form, the feed or the record pages. Signing in, and so
+harvesting, needs an ORCID test client: see [docs/setup-sandboxes.md](docs/setup-sandboxes.md).
 
 ## How it fits together
 
@@ -108,7 +111,8 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 |---|---|
 | `app/main.py` | The application: health check, and creating, reading, updating and submitting drafts. Creates the tables at start-up. |
 | `app/store.py` | The `records` table and the harvest tables, the database connection, and the queries more than one module uses. |
-| `app/access.py` | Who may see or edit a record, decided by labels on records and on users. Everyone is anonymous until sign-in exists. |
+| `app/access.py` | Who may see or edit a record, decided by labels on records and on users; and what each group of users may do. |
+| `app/auth.py` | `/api/auth/…`: sign-in with ORCID, sessions, who the current user is, and the check that guards the harvest API. |
 | `app/harvest/__init__.py` | What every harvester provides: gather, fetch, and mapping to CDIF. |
 | `app/harvest/waf.py` | The web folder harvester, with separate parsers for Apache and nginx directory listings. |
 | `app/harvest/run.py` | Runs one job: compares the source with what is stored, records each record's outcome, and writes errors as rows. Also scheduling and time-outs. |
@@ -140,6 +144,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `src/renderers.jsx` | Custom form controls: the author and contributor lists, and organisation names for publisher and funder. |
 | `src/lookup.jsx` | The search boxes those controls use, backed by `/api/lookup/…`. |
 | `src/Report.jsx` | "Check and submit": shows the server's findings and links each one to its field. |
+| `src/Account.jsx` | The "Sign in with ORCID" link, and who is signed in. Hidden when the server has no ORCID client. |
 | `src/wording.js`, `src/wording/CoreDiscovery.json` | The plain-language label and help line for every field, laid over the copied layout without editing it. |
 | `public/forms/CoreDiscovery/schema.json`, `uischema.json`, `defaults.json` | The form's data shape, its layout, and the blank record. Copied from metadataBuildingBlocks. |
 | `public/forms/PINNED.md` | Which commit those files come from. |
@@ -158,7 +163,10 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `GET /api/lookup/organisations?q=` | Organisations from ROR. |
 | `GET /api/lookup/people?q=` | People from ORCID, by name or iD. |
 | `GET /api/lookup/doi?doi=` | What DataCite, then Crossref, has for a DOI, as CDIF. |
-| `POST /api/harvest/sources` | Register a harvest source. Body: `{title, url, type, config?, organisation?, frequency?}`. `type` is `waf`; `frequency` is `MANUAL`, `DAILY`, `WEEKLY`, `BIWEEKLY` or `MONTHLY`. |
+| `GET /api/auth/orcid/login` | Send the browser to ORCID to sign in. ORCID returns it to `/api/auth/orcid/callback`. |
+| `GET /api/auth/me` | Who is signed in, their groups and permissions, and whether sign-in is set up. |
+| `POST /api/auth/logout` | Sign out. |
+| `POST /api/harvest/sources` | Everything under `/api/harvest` needs a signed-in admin. Register a harvest source. Body: `{title, url, type, config?, organisation?, frequency?}`. `type` is `waf`; `frequency` is `MANUAL`, `DAILY`, `WEEKLY`, `BIWEEKLY` or `MONTHLY`. |
 | `GET /api/harvest/sources`, `GET /api/harvest/sources/{id}` | The sources; one source with its last runs and its record counts. |
 | `POST /api/harvest/sources/{id}/jobs` | Queue a run. Refused while one is in progress. |
 | `POST /api/harvest/sources/{id}/clear` | Remove a source's records and runs, keeping the source. |
@@ -167,7 +175,9 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `GET /catalog.{ttl,jsonld,xml}` | The DCAT catalog feed. Parameters: `page`, `modified_since`, `profiles` (`dcat_ap` or `geodcat_ap`). |
 | `GET /records/{id}` | A published record, in the format the `Accept` header asks for, or `?format=` one of `html`, `cdif`, `dcat-jsonld`, `dcat-ttl`. |
 
-Settings read from the environment: `PUBLIC_URL` (the address written into the feed),
+Settings read from the environment: `ORCID_BASE`, `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET` and
+`ADMIN_ORCIDS` for sign-in (see `docs/setup-sandboxes.md`), `PUBLIC_URL` (the address written into the feed
+and the one ORCID returns people to),
 `CATALOG_TITLE`, `CATALOG_DESCRIPTION`, `CATALOG_PUBLISHER`, `HARVEST_TIMEOUT_MINUTES` (default
 1440) and `HARVEST_POLL_SECONDS` (default 5).
 

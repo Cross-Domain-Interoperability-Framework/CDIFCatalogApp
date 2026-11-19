@@ -192,6 +192,10 @@ A fixed set of named permissions assigned to groups. A user can belong to more t
 
 Harvest-edit is its own named permission, so it can be granted to another group later without a code change.
 
+> **Decided:** to start, only admins can harvest. Registering sources and running them is one named permission, `harvest`, held by the admins group alone. Data managers get it when harvest sources are scoped to organisations.
+
+Built so far: sign-in with ORCID, a users table holding each user's groups and organisations, and the admins group. The first admins are named by ORCID iD in a server setting, so no admin is needed to appoint them. The other three groups, and any screen for managing membership, are not built.
+
 > **Decided:** harvest-edit is scoped by organisation. A data manager can edit harvested records only from sources their own organisation owns. Admins can grant a catalog-wide version to central staff.
 
 ## The editor
@@ -251,7 +255,7 @@ All six were built on 19 November 2026, each as a first version. What each still
 | **DCAT catalog feed with the interface CKAN uses** | `/catalog.{ttl,jsonld,xml}` with `page`, `modified_since` and `profiles=` parameters, and Hydra paging triples (`hydra:PagedCollection` with first, next, last and total). Existing DCAT harvesters, CKAN's included, already walk this. | 5 | Built. Not yet walked by a real CKAN harvester. Lists harvested records only. |
 | **Record address answers by `Accept` header** | The record address serves HTML, CDIF JSON-LD, DCAT JSON-LD or DCAT Turtle according to the request's `Accept` header, and the HTML page advertises the others with `<link rel="alternate">`. | 3 and 5 | Built. The web page is a plain summary, not the designed record page. |
 | **Web folder listings: a parser per server** | Apache, nginx and IIS directory listings differ. Parse each separately, choosing by the response's `Server` header, and take the modified date from the listing to skip unchanged files. | 2 | Built for Apache and nginx, for folders of CDIF JSON-LD, and checked live against both. IIS is set aside: no expected source uses it. An IIS folder is still harvested, without date skipping. |
-| **Organisation-scoped access by labels** | Each record carries labels (`public`, `member-<organisation>`, `creator-<user>`), each user carries labels, and search and edit checks filter on the overlap. This is how the data managers' organisation-scoped harvest-edit permission is built. | 3 and 6 | Labels and the checks are built and the feed uses them. With no sign-in, every reader is anonymous. |
+| **Organisation-scoped access by labels** | Each record carries labels (`public`, `member-<organisation>`, `creator-<user>`), each user carries labels, and search and edit checks filter on the overlap. This is how the data managers' organisation-scoped harvest-edit permission is built. | 3 and 6 | Labels and the checks are built and the feed uses them. Users can sign in, but none is yet given an organisation, so only `public` records are seen. |
 | **Plain-language labels and help text** | Write a label and one line of help for every form field, and rewrite the SHACL rule messages shown in the validation report. CKAN's DCAT-AP form schemas are reference wording only; the text here is our own. | 7, and the report before the scientist sessions | Built for `CoreDiscovery`: 65 fields and 122 rule messages. Not yet read by a scientist. |
 
 ## Spike build plan

@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
 
+from app import access, auth
 from app.harvest import run
 from app.main import app
 
@@ -223,7 +224,16 @@ def test_a_job_with_no_progress_past_the_timeout_is_aborted(db):
     assert row["status"] == "aborted"
 
 
-def test_the_api_registers_a_source_queues_one_run_at_a_time_and_clears(db):
+@pytest.fixture
+def as_admin():
+    # Sign-in itself is tested in test_auth.py; here an admin is simply assumed.
+    admin = access.User(id="test-admin", permissions=access.GROUPS[access.ADMINS])
+    app.dependency_overrides[auth.current_user] = lambda: admin
+    yield
+    app.dependency_overrides.pop(auth.current_user)
+
+
+def test_the_api_registers_a_source_queues_one_run_at_a_time_and_clears(db, as_admin):
     with TestClient(app) as client:
         bad = client.post("/api/harvest/sources", json={"title": "x", "url": BASE, "type": "ftp"})
         assert bad.status_code == 422

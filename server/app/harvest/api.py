@@ -1,19 +1,20 @@
 """/api/harvest: register sources, start and stop runs, and read what a run did.
 
-Until sign-in exists these are open to anyone who can reach the server, and registering a source
-makes the server fetch an address of the caller's choosing. That is acceptable only on a
-developer machine.
+Every request here needs a signed-in user with the `harvest` permission, which to start with
+only admins hold. Registering a source makes the server fetch an address of the caller's
+choosing, so this is not something to leave open.
 """
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
+from app import access, auth
 from app.harvest import HarvestError, harvesters, run
 from app.store import connect
 
-router = APIRouter(prefix="/api/harvest")
+router = APIRouter(prefix="/api/harvest", dependencies=[Depends(auth.require(access.HARVEST))])
 
 
 class NewSource(BaseModel):
