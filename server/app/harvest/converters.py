@@ -6,9 +6,10 @@ function its own `main` uses. In production it should become an installed packag
 is the only place that would change.
 
 Each function below takes the text of one harvested document and returns one CDIF record. The
-converters are asked not to work out conformance themselves (`detect=False`): that needs the
-converters' own `validation` submodule, which is not fetched, and the catalog validates every
-record itself anyway.
+converters are asked not to work out conformance themselves (`detect=False`). The catalog does
+that once, for every converter alike, with the same code they would have used:
+`detect_conformance.py` in the converters' own `validation` submodule (`conformance` below).
+Called from here it reads its rule files from this repository, not from GitHub.
 
 Not connected yet, though a converter exists: DCAT (its entry point takes one dataset picked
 out of a graph, and a file may hold many) and SDMX (one dataflow out of a structure message).
@@ -35,7 +36,7 @@ def _script(relative: str):
     path = ROOT / relative
     if not path.is_file():
         raise HarvestError(
-            f"The converter {relative} is not installed. Run `git submodule update --init` in the repository."
+            f"{relative} is not installed. Run `git submodule update --init --recursive` in the repository."
         )
     for folder in (str(ROOT), str(path.parent)):
         if folder not in sys.path:
@@ -46,6 +47,26 @@ def _script(relative: str):
     sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
+
+
+# The content rules detect_conformance holds a claim to, copied from metadataBuildingBlocks (see
+# app/profiles/PINNED.md). Given no local copy it would fetch them from GitHub on every record.
+SHAPES = Path(__file__).resolve().parents[1] / "conformance"
+
+
+def conformance(record: dict) -> tuple:
+    """The CDIF levels a record's content reaches, as conformance addresses: each level whose
+    marks are present in the record and whose content rules the record does not break."""
+    module = _script("validation/detect_conformance.py")
+    try:
+        return tuple(module.detect_cdif_conformance(record, bb_dir=SHAPES))
+    except Exception as error:  # the script is not ours; whatever it raises is a failed record
+        raise HarvestError(f"Could not work out which CDIF levels the record reaches: {error}") from error
+
+
+def declare(record: dict, levels) -> dict:
+    """Write those levels into the record's catalog record, replacing any CDIF claim there."""
+    return _script("validation/detect_conformance.py").apply_conformance(record, list(levels))
 
 
 def _record(result) -> dict:

@@ -46,10 +46,10 @@ in the feed. See [Intended scope](#intended-scope).
 
 ## Run it
 
-Requires Docker. The converters are a git submodule, so fetch them first:
+Requires Docker. The converters are a git submodule with a submodule of their own, so fetch both first:
 
 ```bash
-git submodule update --init
+git submodule update --init --recursive
 docker compose up --build
 ```
 
@@ -80,7 +80,11 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 - The form's own checks are not trusted. Only the server decides whether a record is valid.
 - The form does not hold a complete record. On checking and submitting, the server removes empty
   fields and adds what the author never sees: the prefixes, an identifier, and the catalog record
-  entry with the profile's conformance declaration, which it reads from the pinned schema.
+  entry with its conformance declaration, which it reads from the pinned files.
+- A record claims only the level its content reaches. With none of the fields the discovery level
+  adds (variables, measurement technique, place, time, quality measurements) it claims the core
+  level and is checked against that; filling any one of them adds the discovery claim and its
+  checks. The fields are found by comparing the two pinned schemas, not listed in code.
 - Harvest jobs wait in a database table. The `worker` service takes them one at a time; there is
   no message broker.
 - A record is seen only by those who share a label with it. A published record carries `public`.
@@ -134,9 +138,10 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `app/messages/CoreDiscovery.json` | Each rule message from the profile's SHACL rules, rewritten in plain words. |
 | `app/lookup.py` | `/api/lookup/…`: searches ROR and ORCID, reads a DOI from DataCite or Crossref, and maps each answer to the shapes the form uses. |
 | `app/validate.py` | `/api/validate`: completes a form document into a record, checks it against the schema and the rules, and turns the results into findings that each name a field. |
-| `app/profiles/CoreDiscovery/schema.json` | The profile's JSON Schema, copied from metadataBuildingBlocks. |
-| `app/profiles/CoreDiscovery/rules.shacl` | The profile's SHACL rules, generated in metadataBuildingBlocks. |
-| `app/profiles/PINNED.md` | Which commit those two files come from and how to refresh them. |
+| `app/profiles/<profile>/schema.json` | A profile's JSON Schema, copied from metadataBuildingBlocks. Two are held: `CoreDiscovery` and the core level alone, `cdifCore`. |
+| `app/profiles/<profile>/rules.shacl` | The profile's SHACL rules, generated in metadataBuildingBlocks. |
+| `app/profiles/cdifCore/conformance.json` | The core level's conformance address, copied from metadataBuildingBlocks. Its schema does not name it. |
+| `app/profiles/PINNED.md` | Which commit those files come from and how to refresh them. |
 | `tests/test_*.py` | The tests, one file per module. Those that need a real database fail, not skip, without one. None uses the network. |
 | `tests/fixtures/shapes/` | The SHACL shapes SEMIC publishes for DCAT-AP 3.0.0 and GeoDCAT-AP 3.0.0. The DCAT output must pass them. `PINNED.md` says where they came from. |
 | `tests/fixtures/CoreDiscovery/` | The profile's own example records and failing cases from metadataBuildingBlocks. The validator must pass the first and fail the second for the named reason. |

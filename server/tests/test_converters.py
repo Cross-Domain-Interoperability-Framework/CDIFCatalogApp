@@ -18,7 +18,7 @@ ROOT = Path(__file__).parents[1] / "converters"
 
 def example(folder: str, pattern: str) -> str:
     found = sorted((ROOT / folder).rglob(pattern))
-    assert found, f"no {pattern} under server/converters/{folder}: run `git submodule update --init`"
+    assert found, f"no {pattern} under server/converters/{folder}: run `git submodule update --init --recursive`"
     return found[0].read_text(encoding="utf-8")
 
 
@@ -98,6 +98,52 @@ def test_a_csw_response_wrapping_one_iso_record_converts():
     one = of_format("ISO19115/examples", "*.xml", "iso19139").split("?>", 1)[-1]
     wrapped = f'<csw:GetRecordByIdResponse xmlns:csw="http://www.opengis.net/cat/csw/2.0.2">{one}</csw:GetRecordByIdResponse>'
     assert convert.to_cdif(detect(wrapped), wrapped)["schema:name"]
+
+
+CORE, DISCOVERY = "https://w3id.org/cdif/core/2.0", "https://w3id.org/cdif/discovery/2.0"
+DATASET = {
+    "@context": {"schema": "http://schema.org/", "dcterms": "http://purl.org/dc/terms/", "dcat": "http://www.w3.org/ns/dcat#",
+                 "prov": "http://www.w3.org/ns/prov#", "cdi": "http://ddialliance.org/Specification/DDI-CDI/1.0/RDF/"},
+    "@id": "https://example.org/d", "@type": ["schema:Dataset"], "schema:name": "A dataset",
+    "schema:identifier": "https://example.org/d",
+    "schema:subjectOf": {"@id": "https://example.org/d#metadata", "@type": ["schema:Dataset"],
+                         "dcterms:conformsTo": [{"@id": "https://w3id.org/cdif/manifest/2.0"}, {"@id": "https://example.org/other"}]},
+}
+
+
+def test_the_levels_a_converted_record_claims_follow_its_content():
+    assert converters.conformance(DATASET) == (CORE,)
+    assert converters.conformance({**DATASET, "schema:temporalCoverage": ["2020/2021"]}) == (CORE, DISCOVERY)
+    record, profile = convert.claim(json.loads(json.dumps(DATASET)), "CoreDiscovery")
+    # the claim it arrived with is replaced; a claim that is not a CDIF level is kept
+    assert [c["@id"] for c in record["schema:subjectOf"]["dcterms:conformsTo"]] == [CORE, "https://example.org/other"]
+    assert profile == "cdifCore"
+    record, profile = convert.claim({**json.loads(json.dumps(DATASET)), "schema:spatialCoverage": [{"schema:name": "Here"}]}, "CoreDiscovery")
+    assert profile == "CoreDiscovery"
+
+
+def test_a_level_whose_content_rules_are_broken_is_not_claimed():
+    activity = {"@type": ["prov:Activity", "schema:Action"], "schema:actionProcess": {"@type": "schema:HowTo"}}
+    with_activity = {**DATASET, "prov:wasGeneratedBy": [activity]}
+    reached = converters.conformance(with_activity)
+    module = converters._script("validation/detect_conformance.py")
+    unchecked = tuple(module.detect_cdif_conformance(with_activity, do_shacl=False))
+    assert "https://w3id.org/cdif/provenance/2.0" in unchecked  # its marks are there
+    assert "https://w3id.org/cdif/provenance/2.0" not in reached  # but a method must have a name
+
+
+def test_every_rule_file_the_detection_names_is_held_here_so_none_is_fetched():
+    module = converters._script("validation/detect_conformance.py")
+    named = sorted(c["shacl"] for c in module.CONFORMANCE_CLASSES if c["shacl"])
+    assert named and [n for n in named if not (converters.SHAPES / n).is_file()] == []
+    assert sorted(p.relative_to(converters.SHAPES).as_posix() for p in converters.SHAPES.rglob("*.shacl")) == named
+
+
+def test_a_record_that_reaches_no_level_gets_the_fallback_claim_so_the_check_can_say_why():
+    bare = {k: v for k, v in json.loads(json.dumps(DATASET)).items() if k != "schema:identifier"}
+    record, profile = convert.claim(bare, "CoreDiscovery")
+    assert profile == "CoreDiscovery"
+    assert {CORE, DISCOVERY} <= {c["@id"] for c in record["schema:subjectOf"]["dcterms:conformsTo"]}
 
 
 def test_declaring_conformance_adds_what_is_missing_and_keeps_what_is_there():

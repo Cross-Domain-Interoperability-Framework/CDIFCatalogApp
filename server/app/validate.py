@@ -39,13 +39,19 @@ def load(profile: str) -> dict:
     schema = json.loads((folder / "schema.json").read_text(encoding="utf-8"))
     shapes = Graph().parse(folder / "rules.shacl", format="turtle")
     context_schema = schema["properties"]["@context"]["properties"]
+    # A composite profile's schema requires its addresses outright. A single level's schema asks
+    # only that something is declared, and its address is in the conformance file beside it.
+    conformance = _conformance_uris(schema["properties"]["schema:subjectOf"])
+    declaration = folder / "conformance.json"
+    if not conformance and declaration.is_file():
+        conformance = {json.loads(declaration.read_text(encoding="utf-8"))["conformsTo"]}
     return {
         "validator": Draft202012Validator(schema, format_checker=FormatChecker()),
         "shapes": shapes,
         # prefix -> the namespace the schema pins it to
         "prefixes": {p: s["const"] for p, s in context_schema.items() if "const" in s},
         "fields": [p for p in schema["properties"] if not p.startswith("@")],
-        "conformance": sorted(_conformance_uris(schema["properties"]["schema:subjectOf"])),
+        "conformance": sorted(conformance),
     }
 
 
@@ -86,6 +92,23 @@ def profile_for(conforms_to, default: str) -> str:
     return best
 
 
+def level_for(profile: str, record: dict) -> str:
+    """The installed profile a record made here is held to, and so what it claims: the one with
+    the fewest conformance addresses, all of them among the given profile's, that has every field
+    the record fills. A record with none of the fields a fuller level adds claims only the lesser
+    level; filling one of them moves it up."""
+    top = set(load(profile)["conformance"])
+    filled = {k for k in record if not k.startswith("@")}
+    best, size = profile, len(top)
+    for folder in sorted(PROFILE_DIR.iterdir()):
+        if (folder / "schema.json").is_file():
+            spec = load(folder.name)
+            claims = set(spec["conformance"])
+            if claims and claims < top and len(claims) < size and filled <= set(spec["fields"]):
+                best, size = folder.name, len(claims)
+    return best
+
+
 def declare(profile: str, record: dict) -> dict:
     """Add the profile's conformance addresses to a record's catalog record, keeping what is
     there. For a record the catalog itself produced by converting another format: the claim is
@@ -121,11 +144,22 @@ def strip_empty(value):
 
 def prepare(profile: str, document: dict, record_id: str | None = None) -> dict:
     """The form's document as a complete record: empties removed, server-owned parts added."""
-    spec = load(profile)
     context = dict(document.get("@context") or {})
     record = strip_empty({k: v for k, v in document.items() if k != "@context"}) or {}
     record = copy.deepcopy(record)
 
+    # The form holds each access condition as a group of fields, and the schema takes such a
+    # group only when it has a web address. One with no address is a plain statement, which the
+    # schema takes as text.
+    conditions = record.get("schema:conditionsOfAccess")
+    if isinstance(conditions, list):
+        record["schema:conditionsOfAccess"] = [
+            ": ".join(c[k] for k in ("schema:name", "schema:description") if c.get(k))
+            if isinstance(c, dict) and c.get("schema:name") and not c.get("schema:url") else c
+            for c in conditions
+        ]
+
+    spec = load(level_for(profile, record))
     record["@context"] = {**context, **spec["prefixes"]}
     record.setdefault("@type", ["schema:Dataset"])
     record.setdefault("@id", f"urn:uuid:{record_id or uuid.uuid4()}")
@@ -396,7 +430,8 @@ def check_record(profile: str, record: dict) -> dict:
 
 def check(profile: str, document: dict, record_id: str | None = None) -> dict:
     """Validate a document from the form, after completing it into a record."""
-    return check_record(profile, prepare(profile, document, record_id))
+    record = prepare(profile, document, record_id)
+    return check_record(level_for(profile, record), record)
 
 
 class CheckRequest(BaseModel):
