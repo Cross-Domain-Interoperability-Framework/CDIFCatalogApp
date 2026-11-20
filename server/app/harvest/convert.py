@@ -7,6 +7,7 @@ harvest: a retry of the failed records converts them from what is stored at the 
 """
 import json
 
+from app import validate
 from app.harvest import HarvestError, converters
 from app.harvest.detect import Detected
 
@@ -51,3 +52,17 @@ def to_cdif(detected: Detected, content: str) -> dict:
             "converters repository) but is not connected to the catalog yet."
         )
     raise HarvestError(f"Recognised as {detected.label}{seen}. There is no converter to CDIF for it.")
+
+
+def claim(record: dict, profile: str) -> tuple:
+    """Give a converted record its conformance claim, and say which profile to check it against.
+
+    The catalog made the record, so the catalog says what it conforms to: the levels its content
+    reaches. The check that follows decides whether the claim holds; if not, the record is not
+    published. A record that does not reach even a level we hold a profile for (no identifier,
+    say) is given the fallback profile's claim, so that the check reports what it lacks."""
+    levels = converters.conformance(record)
+    installed = validate.profile_for(levels, "")
+    if not installed:
+        return validate.declare(profile, record), profile
+    return converters.declare(record, levels), installed
