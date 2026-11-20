@@ -4,11 +4,12 @@ from uuid import UUID
 
 import psycopg
 from fastapi import FastAPI, HTTPException
-from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
-from app import lookup, validate
+from app import auth, lookup, outbound, store, validate
+from app.harvest import api as harvest_api
+from app.store import connect
 
 # Profiles a draft may be written against. The form files for each live in web/public/forms/.
 PROFILES = {"CoreDiscovery"}
@@ -28,27 +29,21 @@ CREATE TABLE IF NOT EXISTS drafts (
 COLUMNS = "id, profile, document, status, created_at, updated_at"
 
 
-def connect() -> psycopg.Connection:
-    url = os.environ.get("DATABASE_URL")
-    if not url:
-        raise HTTPException(503, "The database is not configured.")
-    try:
-        return psycopg.connect(url, connect_timeout=3, row_factory=dict_row)
-    except psycopg.OperationalError:
-        raise HTTPException(503, "The database is not reachable.")
-
-
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     if os.environ.get("DATABASE_URL"):
         with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
             conn.execute(SCHEMA)
+            conn.execute(store.SCHEMA)
     yield
 
 
 app = FastAPI(title="CDIF Catalog", lifespan=lifespan)
 app.include_router(lookup.router)
 app.include_router(validate.router)
+app.include_router(harvest_api.router)
+app.include_router(outbound.router)
+app.include_router(auth.router)
 
 
 def database_status() -> str:

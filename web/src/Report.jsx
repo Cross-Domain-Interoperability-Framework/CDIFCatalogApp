@@ -11,14 +11,15 @@ const GROUPS = [
 ];
 
 // Where each field is in the form: top-level property -> { tab, tabIndex, label, scope }.
-// Read from the form's own layout file, so it follows the form when that changes.
-export function fieldIndex(uischema) {
+// Read from the form's own layout file, so it follows the form when that changes. `labelFor`
+// gives the plain-language label of a control, where there is one.
+export function fieldIndex(uischema, labelFor = () => undefined) {
   const index = {};
   const tabs = uischema.type === 'Categorization' ? uischema.elements : [];
   const walk = (el, tab, tabIndex) => {
     if (el.scope) {
       const property = el.scope.split('/')[2];
-      if (!index[property]) index[property] = { tab, tabIndex, label: el.label || property, scope: el.scope };
+      if (!index[property]) index[property] = { tab, tabIndex, label: labelFor(el) || el.label || property, scope: el.scope };
     }
     (el.elements || []).forEach((child) => walk(child, tab, tabIndex));
   };

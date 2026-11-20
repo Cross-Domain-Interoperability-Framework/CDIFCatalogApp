@@ -92,7 +92,7 @@ def test_either_a_landing_page_or_a_distribution_is_reported_once():
     doc = filled()
     del doc["schema:url"]
     found = violations(validate.check("CoreDiscovery", doc)["findings"])
-    assert len(found) == 1 and "schema:distribution" in found[0]["message"] and found[0]["property"] == "schema:url"
+    assert len(found) == 1 and "download or access the data" in found[0]["message"] and found[0]["property"] == "schema:url"
 
 
 def test_a_nested_problem_says_where():
@@ -135,3 +135,37 @@ def test_endpoint():
     assert ok.status_code == 200 and ok.json()["valid"] is True
     assert client.post("/api/validate", json={"profile": "../etc", "document": {}}).status_code == 422
     assert client.post("/api/validate", json={"profile": "Nope", "document": {}}).status_code == 422
+
+
+def test_the_profile_to_check_against_follows_what_the_record_declares():
+    core, discovery = "https://w3id.org/cdif/core/2.0", "https://w3id.org/cdif/discovery/2.0"
+    assert set(validate.load("CoreDiscovery")["conformance"]) == {core, discovery}
+    assert validate.profile_for([core, discovery, "https://w3id.org/cdif/data_description/2.0"], "Fallback") == "CoreDiscovery"
+    assert validate.profile_for([core], "Fallback") == "Fallback"  # declares less than the profile asks
+    assert validate.profile_for([], "Fallback") == "Fallback"
+
+
+def rule_messages(profile):
+    sh = validate.SH
+    return {" ".join(str(o).split()) for o in validate.load(profile)["shapes"].objects(None, sh.message)}
+
+
+def test_every_rule_message_has_a_plain_language_version():
+    # After the pinned rules are refreshed, a new or reworded message fails here until it is rewritten.
+    plain = validate.plain_messages("CoreDiscovery")
+    assert sorted(rule_messages("CoreDiscovery") - set(plain)) == []
+    assert sorted(set(plain) - rule_messages("CoreDiscovery")) == []  # no entries for rules that are gone
+
+
+def test_plain_messages_use_no_schema_terms():
+    jargon = ("schema:", "dcterms:", "skos:", "prov:", "dcat:", "spdx:", "@id", "IRI", "PropertyValue", "DefinedTerm", "node")
+    for message in validate.plain_messages("CoreDiscovery").values():
+        assert not [word for word in jargon if word in message], message
+        assert message[0].isupper() and message.endswith("."), message
+
+
+def test_the_report_shows_the_plain_version_and_still_finds_the_field():
+    report = validate.check("CoreDiscovery", {"@type": "schema:Dataset", "schema:name": "Only a name"})
+    by_property = {f["property"]: f["message"] for f in report["findings"] if f["source"] == "rules"}
+    assert by_property["schema:license"] == "Say how the data may be used: add a licence or the conditions of access."
+    assert not [m for m in by_property.values() if "schema:" in m]

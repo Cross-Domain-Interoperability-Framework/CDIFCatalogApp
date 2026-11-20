@@ -12,19 +12,24 @@ This file covers only the commands and the traps.
 
 ## Where the project is
 
-An early prototype of the record submission form for the CDIF `CoreDiscovery` profile. Built: the
-form, draft saving, ORCID/ROR pickers, DOI pre-fill, server validation with a report, and submit.
-Not built: sign-in, the dry run and scientist sessions (plan days 9 and 10), and everything in the
-wider design (harvest, search, outbound interfaces). Do not start those without being asked.
+An early prototype. Built: the `CoreDiscovery` submission form (draft saving, ORCID/ROR pickers,
+DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
+web folders with a worker; the DCAT catalog feed; record addresses with content negotiation; and
+label-based access; and sign-in with ORCID, with an admin-only harvest API. Not built: ownership
+of drafts, the dry run and scientist sessions (plan days 9 and 10),
+other harvesters, mappings into CDIF, publishing of submitted records, search, CSW, OGC API
+Records and the sitemap. Do not start those without being asked.
 
 ## Commands
 
 Everything runs in Docker. There is no local Python or Node setup to rely on.
 
 ```bash
-docker compose up --build            # db, api (8000), web (5173); open http://localhost:5173
+git submodule update --init          # once after cloning: fetches server/converters
+docker compose up --build            # db, api (8000), worker, web (5173); open http://127.0.0.1:5173
 docker compose exec api pytest       # server tests; they need the database, so run them here
-docker compose up -d --build api     # after changing server/requirements*.txt
+docker compose up -d --build api worker   # after changing server/requirements*.txt
+docker compose up -d --build web     # after changing web/vite.config.js or package.json
 cd web && npm run build              # the only front-end check there is
 ```
 
@@ -39,6 +44,11 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
 - **The browser calls only this server.** Calls to ROR, ORCID, DataCite and Crossref, and the
   mapping of their answers to CDIF, live in `server/app/lookup.py`.
 - **Only the server decides validity.** The form's own checks are not shown and not trusted.
+- **Code taken from CKAN is reimplemented, never copied.** CKAN and its extensions are AGPL; this
+  project is Apache-2.0. `docs/design.md` lists the practices adopted.
+- **Every read of `records` for an outside reader goes through `store.visible_records` or
+  `store.visible_record`**, which apply the label filter. Change a record's status with
+  `store.set_status`, which recomputes its labels.
 - **Text a user reads is plain language**: no schema terms, no jargon. British spelling in the
   interface ("organisation", "licence").
 - **Tests that need something fail without it; they do not skip.** A skipped test reads the same
@@ -46,9 +56,25 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
 
 ## Traps
 
-- **Files copied from metadataBuildingBlocks are not edited here.** That is
+- **`server/converters` is a git submodule and is not edited here.** A converter's defect is an
+  issue for the `converters` repository. To move to a newer commit: `git -C server/converters
+  fetch && git -C server/converters checkout <commit>`, run the tests, then commit the submodule
+  pointer. `test_converters.py` runs the real converters on their own examples and fails if the
+  submodule is missing or a converter's call signature has changed. Its nested `validation`
+  submodule is deliberately not fetched; the converters are called with `detect=False`.
+- **A converted record gets the catalog's own conformance claim** (`validate.declare`) before it
+  is checked, because the catalog made the record. A CDIF record that was harvested as CDIF
+  keeps exactly what it declared.
+- **The converters are scripts, not a package.** `converters.py` loads each from its file and
+  puts its folder on the import path. New Python dependencies of a converter go in
+  `server/requirements.txt` (today: `lxml`, `pyld`, `requests`).
+- **Some converters are slow or return shapes the catalog cannot take.** DDI 1.2.2 and Codebook
+  2.5 return an `@graph` of nodes, which is reported, not stored. It is decided that framing is
+  the converter's job: do not add a framing step to the catalog. A large FAIR2 record took over
+  a minute to convert and check.
+- **Files copied from elsewhere are not edited here.** From metadataBuildingBlocks:
   `web/public/forms/CoreDiscovery/*`, `server/app/profiles/CoreDiscovery/*` and
-  `server/tests/fixtures/CoreDiscovery/*`. Each has a `PINNED.md` naming the commit and the refresh
+  `server/tests/fixtures/CoreDiscovery/*`. From SEMIC: `server/tests/fixtures/shapes/*`. Each has a `PINNED.md` naming the commit and the refresh
   steps. Refresh the form files and the validation files together, or the form and the validator
   disagree. A defect in them is an issue for metadataBuildingBlocks, not a local patch.
 - **Do not write a conformance address or its version in code.** `validate.load` reads them from
@@ -69,6 +95,40 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   positions.** `validate._merge` keeps one finding per problem; `_field_named_in` guesses a field
   from a rule's wording when the rule names none. Both are heuristics: when the pinned files are
   refreshed, print the report for a blank and a filled form and read it.
+- **Three files must follow the pinned files.** `server/app/messages/CoreDiscovery.json` needs an
+  entry for every rule message, and `server/app/mappings/cdif-to-dcat.tsv` a row for every profile
+  property; a test fails for each when they fall behind. `web/src/wording/CoreDiscovery.json`
+  needs an entry for every control in the layout, which nothing tests, so compare the two by hand
+  after a refresh.
+- **The SEMIC shapes do no inference.** A value's class must be stated outright
+  (`dcat:Resource`, `foaf:Agent`, `rdfs:Resource` on an access address) or the shape rejects it.
+- **rdflib's `DCAT` namespace predates DCAT 3** and warns on `dcat:version`. Build such terms as
+  a `URIRef`.
+- **Turtle output is not stable text.** Blank nodes come out in a different order each time;
+  compare graphs, not strings.
+- **The web folder harvester does not parse listing layouts.** It takes the links from the page
+  and asks each file for its `Last-Modified` date with a HEAD request, the way Esri's Geoportal
+  harvester does. Do not bring back per-server listing parsers. A server that sends no
+  `Last-Modified` leaves its files undated; they are then fetched each run and recognised by
+  content hash.
+- **A harvested file's format comes from `detect.py`, never from its name or media type.** When
+  adding a format, add it to `FORMATS`, add a snippet to `test_detect.py`, and run the detector
+  over the real examples in the `converters` repository (a checkout beside this one), which is
+  how its rules were tuned. Recognising a format and converting it are separate:
+  `converters.CONNECTED` holds what is connected.
+- **A CDIF record is validated against the profile its own catalog record declares**
+  (`validate.profile_for`), not against a setting. The source's `profile` setting is only the
+  fallback for a record that declares nothing we hold a profile for.
+- **`robots.txt` is obeyed by wrapping the HTTP client (`robots.Polite`), so a harvester must use
+  the client it is given** and not open its own. A closed address raises `Disallowed`; a
+  harvester walking a source catches it and skips that address. Only a closed starting point
+  should fail the run.
+- **Records missing from a source are withdrawn at the end of a run, and only if no fetch
+  failed in it.** A retry run never withdraws and never counts as the last clean run.
+- **Git Bash rewrites `/srv/...` arguments into Windows paths.** Prefix a `docker compose exec`
+  that passes a container path with `MSYS_NO_PATHCONV=1`.
+- **`web/vite.config.js` is baked into the web image**, not mounted. A proxy change needs the
+  image rebuilt.
 - **JSON Forms gives no way to switch tabs from outside.** `Report.jsx` clicks the tab element.
   The stock date field is segmented and ignores text typed by browser automation; set dates
   through the API when testing in a browser.
@@ -78,6 +138,19 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   Read and write files as UTF-8 explicitly; the platform default is cp1252. Shell heredocs
   containing apostrophes fail to parse here: write the file with a tool or a script.
 - **Switching git branches changes the code under the running containers**, because of the mounts.
-- **Drafts have no owner yet.** Anyone with a draft's id can read and change it. Acceptable only
-  on a developer machine; sign-in is the next server step and needs the ORCID sandbox client from
-  `docs/setup-sandboxes.md`.
+- **The sign-in tests stand in for ORCID.** They replace `auth.exchange_code`, so they prove the
+  catalog's half of the round trip only. The real exchange worked against the ORCID sandbox on
+  19 November 2026 (scope `/authenticate`; `orcid` and `name` read from the answer). After
+  changing `auth.py`, sign in once for real.
+- **A route that changes anything needs `Depends(auth.require(<permission>))`.** The harvest
+  router applies it to every route at once. A test that needs a signed-in user overrides
+  `auth.current_user` (see `as_admin` in `test_harvest.py`).
+- **`ADMIN_ORCIDS` only ever adds the admins group, at sign-in.** Removing an iD from the setting
+  does not demote anyone; that is an edit to `users.groups` in the database.
+- **ORCID refuses a return address containing `localhost`.** `PUBLIC_URL` therefore defaults to
+  `http://127.0.0.1:5173`, and the page's sign-in link always points there (`sign_in_url` from
+  `/api/auth/me`). Do not compare the request's `Host` header with `PUBLIC_URL` on the server:
+  the Vite proxy rewrites it to `api:8000`, and a redirect built on that comparison loops. A draft started under one name is not found under the other, because the browser keeps
+  each name's storage apart.
+- **Drafts have no owner yet.** Anyone with a draft's id can read and change it, signed in or
+  not. Acceptable only on a developer machine; tying drafts to the signed-in user is the next server step.

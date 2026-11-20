@@ -24,6 +24,7 @@ from rdflib import BNode, Graph, Namespace, URIRef
 from rdflib.namespace import RDF
 
 PROFILE_DIR = Path(__file__).parent / "profiles"
+MESSAGE_DIR = Path(__file__).parent / "messages"
 SH = Namespace("http://www.w3.org/ns/shacl#")
 SEVERITY = {SH.Violation: "violation", SH.Warning: "warning", SH.Info: "info"}
 CONFORMANCE_PREFIX = "https://w3id.org/cdif/"
@@ -48,6 +49,15 @@ def load(profile: str) -> dict:
     }
 
 
+@lru_cache
+def plain_messages(profile: str) -> dict:
+    """Each rule's message -> the same thing in plain words (messages/<profile>.json). The rules
+    are written for people who know the schema; the report is read by people who do not. A rule
+    with no entry keeps its own wording, and a test fails until it has one."""
+    path = MESSAGE_DIR / f"{profile}.json"
+    return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+
+
 def _conformance_uris(node, inside=False) -> set:
     """Every profile address the schema requires under dcterms:conformsTo."""
     found = set()
@@ -60,6 +70,34 @@ def _conformance_uris(node, inside=False) -> set:
         for item in node:
             found |= _conformance_uris(item, inside)
     return found
+
+
+def profile_for(conforms_to, default: str) -> str:
+    """The installed profile to validate a record against, from what its own catalog record says
+    it conforms to: the profile that asks for the most of those addresses, all of which the
+    record declares. A record declaring nothing we hold a profile for gets the default."""
+    declared = set(conforms_to)
+    best, size = default, 0
+    for folder in sorted(PROFILE_DIR.iterdir()):
+        if (folder / "schema.json").is_file():
+            wanted = set(load(folder.name)["conformance"])
+            if wanted and wanted <= declared and len(wanted) > size:
+                best, size = folder.name, len(wanted)
+    return best
+
+
+def declare(profile: str, record: dict) -> dict:
+    """Add the profile's conformance addresses to a record's catalog record, keeping what is
+    there. For a record the catalog itself produced by converting another format: the claim is
+    the catalog's to make, and it is only published if the check that follows bears it out."""
+    about = record.get("schema:subjectOf")
+    if not isinstance(about, dict):
+        return record  # no catalog record to add to; the check will say so
+    listed = about.get("dcterms:conformsTo")
+    listed = listed if isinstance(listed, list) else ([listed] if listed else [])
+    have = {(c.get("@id") if isinstance(c, dict) else c) for c in listed}
+    about["dcterms:conformsTo"] = listed + [{"@id": uri} for uri in load(profile)["conformance"] if uri not in have]
+    return record
 
 
 def strip_empty(value):
@@ -272,27 +310,32 @@ def _field_named_in(message: str, fields: list) -> list:
     return [min(hits)[1]] if hits else []
 
 
-def shacl_findings(spec: dict, record: dict) -> list[dict]:
+def shacl_findings(spec: dict, record: dict, plain: dict | None = None) -> list[dict]:
     import pyshacl
+
+    plain = plain or {}
 
     data = Graph().parse(data=json.dumps(record), format="json-ld")
     _, report, _ = pyshacl.validate(
         data, shacl_graph=spec["shapes"], advanced=True, inference="none", allow_warnings=True
     )
-    prefixes = record["@context"]
-    root = URIRef(record["@id"])
+    # A harvested record may lack either of these; the schema check reports that, and this one
+    # must not fall over on it.
+    prefixes = record.get("@context") if isinstance(record.get("@context"), dict) else {}
+    root = URIRef(record["@id"]) if isinstance(record.get("@id"), str) else None
     seen, out = set(), []
     for result in report.subjects(RDF.type, SH.ValidationResult):
         focus = report.value(result, SH.focusNode)
         result_path = report.value(result, SH.resultPath)
-        path = _path_from_root(data, root, focus, prefixes)
+        path = _path_from_root(data, root, focus, prefixes) if root is not None else None
         if path is None:
             path = []
         if isinstance(result_path, URIRef):
             path = path + [_compact(str(result_path), prefixes)]
         message = " ".join(str(report.value(result, SH.resultMessage) or "").split())
         if not path:
-            path = _field_named_in(message, spec["fields"])
+            path = _field_named_in(message, spec["fields"])  # from the rule's own wording
+        message = plain.get(message, message)
         severity = SEVERITY.get(report.value(result, SH.resultSeverity), "violation")
         key = (severity, tuple(path), message)
         if key in seen:  # the same rule is declared in more than one building block
@@ -335,19 +378,25 @@ def _merge(schema: list, rules: list) -> list:
     return schema_kept + rules_kept
 
 
-def check(profile: str, document: dict, record_id: str | None = None) -> dict:
+def check_record(profile: str, record: dict) -> dict:
+    """Validate a complete record as it stands. Harvested records come this way: they already
+    carry their own identifier and catalog record, which must not be rewritten."""
     spec = load(profile)
-    record = prepare(profile, document, record_id)
     findings = schema_findings(spec, record)
     # SHACL reads the record as a graph. If the schema already rejected it the graph may not
     # mean what the author intended, but its advice about missing recommended fields still helps.
-    findings = _merge(findings, shacl_findings(spec, record))
+    findings = _merge(findings, shacl_findings(spec, record, plain_messages(profile)))
     for f in findings:
         f["property"] = f["path"][0] if f["path"] else None
         f["where"] = _where(f["path"])
     findings.sort(key=lambda f: (ORDER[f["severity"]], str(f["property"])))
     counts = {s: sum(f["severity"] == s for f in findings) for s in ORDER}
     return {"valid": counts["violation"] == 0, "counts": counts, "findings": findings, "record": record}
+
+
+def check(profile: str, document: dict, record_id: str | None = None) -> dict:
+    """Validate a document from the form, after completing it into a record."""
+    return check_record(profile, prepare(profile, document, record_id))
 
 
 class CheckRequest(BaseModel):

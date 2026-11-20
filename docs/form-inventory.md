@@ -107,6 +107,7 @@ controls do not address. That is not the case:
 ## Found for metadataBuildingBlocks
 
 These are defects or questions in the source of the form files, not in this application:
+All five were filed there on 17 November 2026: [#106](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/106), [#107](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/107), [#108](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/108), [#109](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/109), [#110](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/110), in the order below.
 
 1. `defaults.json` and the generated `schema.json` disagree on the shape of the catalog record's
    `schema:additionalType` items (object with `@id` versus string).

@@ -1,0 +1,34 @@
+# CDIF CoreDiscovery to DCAT-AP 3 and GeoDCAT-AP 3. One row per top-level CDIF property.
+# `how` names the function in app/dcat.py that writes the property; `lost` means DCAT-AP has no
+# place for it and it is left out. A test fails if the profile schema gains a property not listed.
+# profile: `all` for both outputs, `geodcat_ap` for GeoDCAT-AP only.
+cdif	dcat	how	profile	note
+schema:name	dcterms:title	text	all	
+schema:description	dcterms:description	text	all	DCAT-AP requires one. When the record has none, it is the title followed by "description missing".
+schema:version	dcat:version	text	all	
+schema:datePublished	dcterms:issued	date	all	
+schema:dateModified	dcterms:modified	date	all	
+schema:url	dcat:landingPage	page	all	
+schema:identifier	dcterms:identifier	identifier	all	The scheme (propertyID) is not carried; the value or its address is.
+schema:sameAs	adms:identifier	other_identifiers	all	
+schema:keywords	dcat:keyword	keywords	all	A vocabulary term is written as its label. Its vocabulary address is lost: dcat:theme accepts only terms of a registered theme scheme.
+schema:creator	dcterms:creator	agents	all	Author order is lost: RDF properties are unordered.
+schema:contributor	dcterms:contributor	agents	all	The role name is lost.
+schema:publisher	dcterms:publisher	agents	all	Any agent given only as an address, with no name anywhere in the record, is lost: DCAT-AP requires a name.
+schema:provider	geodcat:distributor	agents	geodcat_ap	Not in DCAT-AP; lost there.
+schema:license	dcterms:license	license	all	Written on each distribution, where DCAT-AP expects it, or on the dataset when there is no distribution.
+schema:conditionsOfAccess	dcterms:accessRights	access_rights	all	Several conditions become labels of one rights statement.
+schema:distribution	dcat:distribution	distributions	all	Checksum, per-distribution provider and web service actions are lost.
+schema:spatialCoverage	dcterms:spatial	spatial	all	A bounding box or point is carried; other geometry and place types are lost.
+schema:temporalCoverage	dcterms:temporal	temporal	all	Only intervals written as start/end dates are carried; numeric time positions are lost.
+schema:subjectOf	dcat:CatalogRecord	catalog_record	all	Maintainer and source catalog are lost.
+schema:inLanguage		lost	all	DCAT-AP needs a language address from the EU vocabulary; CDIF holds a code.
+schema:additionalType		lost	all	
+schema:funding		lost	all	
+schema:relatedLink		lost	all	
+schema:publishingPrinciples		lost	all	
+schema:variableMeasured		lost	all	DCAT-AP has no variable-level description.
+schema:measurementTechnique		lost	all	
+dqv:hasQualityMeasurement		lost	all	
+prov:wasGeneratedBy		lost	all	
+prov:wasDerivedFrom		lost	all	

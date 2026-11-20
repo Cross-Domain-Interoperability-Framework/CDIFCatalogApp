@@ -24,7 +24,7 @@ The requirement is small. The platform carrying it is large and its canonical mo
 
 | Layer                   | Choice                                                                                                                                                                       | Already in hand                                                                                                                       |
 |-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
-| Harvest                 | Small Python connectors, one YAML file per source. Scheduled by cron at first; Dagster if sources pass about 50.                                                             | Sitemap crawling and conformance dispatch, to port from the fork's Simple URL harvester.                                              |
+| Harvest                 | Small Python connectors. Sources are registered in the database and run by a worker that reads a job table; Dagster if sources pass about 50.                               | Sitemap crawling and conformance dispatch, to port from the fork's Simple URL harvester.                                              |
 | Mapping                 | XML through XSLT 3 run from Python (`saxonche`). JSON and RDF through SSSOM-table converters. All map straight to CDIF.                                                      | `iso19115-3-to-cdif.xsl` and the DDE transforms are reusable as they are. The DCAT and Croissant converters are already table-driven. |
 | Validation              | JSON Schema plus SHACL on every save and every harvest.                                                                                                                      | The building block schemas and rules, `FrameAndValidate`, `detect_conformance`.                                                       |
 | Store and search        | PostgreSQL with JSONB, PostGIS and full-text search.                                                                                                                         | New.                                                                                                                                  |
@@ -80,7 +80,50 @@ Records are stored in PostgreSQL as JSON documents (the `jsonb` column type). Ea
 - **Search does not read the JSON directly.** A flat search row is derived from each published record on save: title, description, keywords, a geometry for the bounding box, date ranges and a full-text index. The JSON is the record; the search row is an index that can be rebuilt from it at any time.
 - **ISO and DCAT output** are stored the same way: derived from the published record on publish, never edited.
 
-Built so far: only the drafts table. The layout above is the design for the harvesting work.
+Built so far: the drafts table, and the `records` table with the layout above. Harvested records fill it; publishing a submitted draft into it is not built.
+
+> **Decided:** a submitted draft is not published. It stays out of the catalog feed and has no record address until the review step exists and a curator approves it.
+
+### How harvests are stored
+
+The model is the one ckanext-harvest uses, reimplemented.
+
+| Table | One row is | Holds |
+|---|---|---|
+| `harvest_sources` | A registered source | Address, type, settings, owning organisation, how often it runs and when it runs next. |
+| `harvest_jobs` | One run of a source | Its state (new, running, finished, aborted) and when each stage started and ended. |
+| `harvest_objects` | One source record seen in one run | The record's identifier at the source, the source's modified date, and how it ended: added, updated, not modified, deleted or errored. |
+| `harvest_errors` | One failure | The run, the record if there was one, the stage (gather, fetch, import or job) and the message. |
+
+- **Three stages.** Gather (list what the source holds), fetch (get one record as sent) and import. Each kind of source provides the first two. Import is shared: recognise the format from the content, convert it to CDIF, validate, store.
+- **Format is recognised from content.** File names and media types are not trusted. A CDIF JSON-LD record is recognised by the conformance addresses in its catalog record (`schema:subjectOf`, `dcterms:conformsTo`), and those addresses choose the profile it is validated against. Also recognised: schema.org, DCAT, Croissant, FAIR2, RO-Crate and DDI-CDI JSON-LD; UMM, STAC, DataCite, CKAN, DCAT-US and NIAID JSON; ISO 19139, 19115-2 and 19115-3, CSW responses, FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI 1.2.2, DDI Codebook 2.5, DDI Lifecycle, DDI-CDI, SDMX-ML, OGC capabilities and DCAT RDF/XML; DCAT and schema.org Turtle.
+- **Recognising is not converting.** A record in a format with no connected converter is stored as received, and the run reports the format and any converter that exists for it. Once a converter is connected, a retry of the failed records converts them.
+- **Converters come from the CDIF `converters` repository**, a git submodule pinned to a commit. A converted record is given the catalog's own conformance declaration, then checked; it is published only if it passes. The table below is what each connected converter did on its own example files on 19 November 2026.
+
+| Format | Converter | On its examples, against the pinned `CoreDiscovery` profile |
+|---|---|---|
+| ISO 19139, ISO 19115-2, ISO 19115-3, and a CSW response holding one record | `ISO19115/iso_to_cdif.py` | Valid (3 of 3 each). |
+| DDI-CDI XML | `DDI-CDI/ddicdi_to_cdif.py` | Valid (2 of 2). |
+| schema.org JSON-LD | `soso/ConvertFromSOSO.py` | Converts; not valid (3 of 3). For example a funder given as text, and a citation address that is not a web address. |
+| Croissant | `croissant/ConvertFromCroissant.py` | Converts; not valid (3 of 3): `@type` written as one word where the profile wants a list. |
+| RO-Crate | `ROCrate/ROCrateToCDIF.py` | Converts; not valid (3 of 3): file size written as a number where the profile wants text. |
+| NASA UMM-C | `UMM/umm_to_cdif.py` | Converts; not valid (3 of 3): distributions with no download address. |
+| DDI-CDI JSON-LD | `DDI-CDI/ddicdi_jsonld_to_cdif.py` | Converts; not valid (3 of 3): a distribution name that is not text. |
+| FAIR2 | `FAIR2/fair2_to_cdif.py` | Converts; not valid (1 of 1): checksums with no algorithm. Took over a minute. |
+| DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Converts, but to a graph of separate nodes. Framing is the converter's job (see the decision below), so this is reported, not stored as CDIF, until the converter returns a nested record. Slow: 6 to 25 seconds a record. |
+| DCAT (JSON-LD, RDF/XML, Turtle), SDMX-ML | exist | Not connected: each takes one dataset or dataflow picked out of a larger document. |
+| FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI Lifecycle, OGC capabilities, STAC, CKAN, DCAT-US, NIAID | none connected | Recognised and kept as received. NIAID has a harvester script, not a converter function. |
+
+The "not valid" rows are for the `converters` and `metadataBuildingBlocks` repositories to settle: either the converter's output or the profile the catalog pins is behind the other. They are not patched here.
+- **`robots.txt` is obeyed**, including its crawl delay, unless a source's settings say to ignore it. A closed subfolder or file is skipped; a closed starting point fails the run.
+- **Failed records can be retried alone.** A retry run fetches and imports again only the records that ended in an error in an earlier run.
+- **Changed since, only after a clean run.** A source is asked for changes since the last run that finished with no errors. After a run with errors the next asks for everything, so a failure cannot hide a record for good.
+- **Deletion needs a complete listing and a trouble-free run.** A record missing from a full listing is withdrawn, at the end of the run and only if every listed record could be fetched. A "changed since" listing says nothing about what it leaves out, and a source that is failing requests cannot be trusted about what it lists.
+- **Invalid records are stored, not published.** The text as received is kept, the problem is an error row, and the record is not served.
+- **The queue is the job table.** A worker claims a waiting job with a row lock that other workers skip. There is no message broker.
+- **Not built:** email to an organisation's admins when a run fails, because there are no users to send it to until sign-in exists.
+
+> **Decided:** if a source changes a published record into an invalid one, the record stops being served until it is fixed. The earlier valid version is not kept on show.
 
 ## Who submits, and how
 
@@ -153,8 +196,11 @@ A record is offered only in formats its content can honestly fill. The catalog r
 
 - **One CDIF document per record.** The CDIF profiles are layers of one record, so the catalog serves the full record, declaring every profile it meets. A harvester asking for Discovery receives a record that also carries the richer layers. A profile parameter filters which records are returned; it does not cut records down.
 - **Asking for a format.** A format and profile parameter on the record address, plus standard content negotiation. Profiles are named by their published CDIF conformance addresses.
+- **A record with no description still goes out as DCAT.** DCAT-AP requires a description and CDIF does not, so the DCAT description is then the title followed by "description missing".
 - **DCAT output loses detail, and says so.** DCAT-AP has no place for variable-level description or data structure. The mapping table states what is dropped, as the existing converters do.
 - **New work.** A CDIF-to-DCAT mapping. The existing DCAT-to-CDIF table is the starting point but runs the other way.
+
+> **Decided:** DCAT output targets DCAT-AP 3.0.0 and GeoDCAT-AP 3.0.0 for now. GeoDCAT-AP 3.1.0 exists, but how widely it is adopted is not known.
 
 ## Groups and permissions
 
@@ -168,6 +214,16 @@ A fixed set of named permissions assigned to groups. A user can belong to more t
 | Admins        | Manage groups, membership and all sources.                                                                                      |
 
 Harvest-edit is its own named permission, so it can be granted to another group later without a code change.
+
+> **Decided:** a web folder source picks up files ending in `.json`, `.jsonld`, `.xml`, `.ttl` and `.rdf` unless its settings list others. What each file is comes from its content, not its ending.
+
+> **Decided:** framing happens in the converter. A converter hands the catalog one nested record per dataset, not a graph of separate nodes. The catalog does not frame; a converter that returns a graph is reported and its record is not stored as CDIF. Today that is the DDI 1.2.2 and DDI Codebook 2.5 converters, which need changing in the `converters` repository.
+
+> **Decided:** the converters are brought in as a git submodule for now. For production they should become an installed package; `server/app/harvest/converters.py` is the only module that would change.
+
+> **Decided:** to start, only admins can harvest. Registering sources and running them is one named permission, `harvest`, held by the admins group alone. Data managers get it when harvest sources are scoped to organisations.
+
+Built so far: sign-in with ORCID, a users table holding each user's groups and organisations, and the admins group. The first admins are named by ORCID iD in a server setting, so no admin is needed to appoint them. The other three groups, and any screen for managing membership, are not built.
 
 > **Decided:** harvest-edit is scoped by organisation. A data manager can edit harvested records only from sources their own organisation owns. Admins can grant a catalog-wide version to central staff.
 
@@ -215,6 +271,23 @@ The form schema for each profile is already generated from the building blocks. 
 6.  **Harvest registration, overlay editing and conflict handling** for data managers.
 7.  **DDE editor layout and the remaining custom controls.**
 8.  **Retire GeoNetwork.** Until then it stays up and is harvested over CSW.
+
+## To do: practices taken from CKAN
+
+CKAN is not the base for this catalog (see Alternatives considered), but a review of `ckan`, `ckanext-dcat`, `ckanext-spatial`, `ckanext-harvest` and `ckanext-scheming` on 18 and 19 November 2026 found practices worth adopting. All but `ckanext-scheming` are AGPL, so each item below is reimplemented here, not copied.
+
+All six were built on 19 November 2026, each as a first version. What each still lacks is in the last column.
+
+Esri's Geoportal harvester (Apache-2.0) was reviewed the same day. Its web folder approach replaced CKAN's here. Four more of its practices were then built: obeying a site's `robots.txt` and crawl delay, a retry of only the records that failed in a run, no withdrawal of missing records in a run that had fetch failures, and recognising a metadata format from its content instead of its file extension.
+
+| To do | Detail | Belongs to step | Built, and what is missing |
+|---|---|---|---|
+| **Test DCAT output against the official shapes** | Serialise records as DCAT-AP and GeoDCAT-AP, then run pyshacl against the SHACL shapes published by SEMIC. Fetch the shapes from SEMIC and pin them, as the CDIF schema and rules are pinned. | 5 | Built for DCAT-AP 3.0.0 and GeoDCAT-AP 3.0.0, on the three example records. |
+| **DCAT catalog feed with the interface CKAN uses** | `/catalog.{ttl,jsonld,xml}` with `page`, `modified_since` and `profiles=` parameters, and Hydra paging triples (`hydra:PagedCollection` with first, next, last and total). Existing DCAT harvesters, CKAN's included, already walk this. | 5 | Built. Not yet walked by a real CKAN harvester. Lists harvested records only. |
+| **Record address answers by `Accept` header** | The record address serves HTML, CDIF JSON-LD, DCAT JSON-LD or DCAT Turtle according to the request's `Accept` header, and the HTML page advertises the others with `<link rel="alternate">`. | 3 and 5 | Built. The web page is a plain summary, not the designed record page. |
+| **Web folder harvesting** | CKAN parses Apache, nginx and IIS listings separately, chosen by the `Server` header, and reads dates from the listing. | 2 | Built that way first, then replaced on the same day with the approach of Esri's Geoportal harvester: read only the links from the listing, and ask each file for its own `Last-Modified` date. It needs no per-server code and works where a listing shows no dates. Checked live against nginx and Apache, for folders of CDIF JSON-LD. |
+| **Organisation-scoped access by labels** | Each record carries labels (`public`, `member-<organisation>`, `creator-<user>`), each user carries labels, and search and edit checks filter on the overlap. This is how the data managers' organisation-scoped harvest-edit permission is built. | 3 and 6 | Labels and the checks are built and the feed uses them. Users can sign in, but none is yet given an organisation, so only `public` records are seen. |
+| **Plain-language labels and help text** | Write a label and one line of help for every form field, and rewrite the SHACL rule messages shown in the validation report. CKAN's DCAT-AP form schemas are reference wording only; the text here is our own. | 7, and the report before the scientist sessions | Built for `CoreDiscovery`: 65 fields and 122 rule messages. Not yet read by a scientist. |
 
 ## Spike build plan
 
@@ -291,7 +364,6 @@ If the day 2 inventory shows the stock form is unusable in ways the planned cust
 
 ## Open questions
 
-- Which DCAT-AP and GeoDCAT-AP versions should the feed target?
 - Which identity provider: ORCID alone, or ORCID plus an institutional login for staff?
 - Where do the SKOS vocabularies live once GeoNetwork is retired?
 

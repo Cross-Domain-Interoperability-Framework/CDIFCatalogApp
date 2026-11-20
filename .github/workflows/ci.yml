@@ -42,6 +42,8 @@ jobs:
         working-directory: server
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: true  # server/converters; its own nested submodule is not needed
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
