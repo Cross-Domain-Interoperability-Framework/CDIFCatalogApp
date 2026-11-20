@@ -217,7 +217,7 @@ Harvest-edit is its own named permission, so it can be granted to another group 
 
 > **Decided:** a web folder source picks up files ending in `.json`, `.jsonld`, `.xml`, `.ttl` and `.rdf` unless its settings list others. What each file is comes from its content, not its ending.
 
-> **Decided:** framing happens in the converter. A converter hands the catalog one nested record per dataset, not a graph of separate nodes. The catalog does not frame; a converter that returns a graph is reported and its record is not stored as CDIF. Today that is the DDI 1.2.2 and DDI Codebook 2.5 converters, which need changing in the `converters` repository.
+> **Decided:** framing happens in the converter. A converter hands the catalog one nested record per dataset, not a graph of separate nodes. The catalog does not frame; a converter that returns a graph is reported and its record is not stored as CDIF. Today that is the DDI 1.2.2 and DDI Codebook 2.5 converters, which need changing in the `converters` repository ([converters issue 38](https://github.com/Cross-Domain-Interoperability-Framework/converters/issues/38)).
 
 > **Decided:** the converters are brought in as a git submodule for now. For production they should become an installed package; `server/app/harvest/converters.py` is the only module that would change.
 
