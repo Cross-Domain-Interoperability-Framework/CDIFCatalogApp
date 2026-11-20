@@ -88,6 +88,21 @@ def test_a_record_filled_in_through_the_form_is_valid():
     assert len(authors) == 1 and authors[0]["@type"] == ["schema:Person"]  # empty row dropped, type made a list
 
 
+def test_an_access_condition_with_no_address_is_kept_as_text_and_stands_in_for_a_licence():
+    doc = filled()
+    del doc["schema:license"]
+    doc["schema:conditionsOfAccess"] = [
+        {"@type": "schema:CreativeWork", "schema:name": "Registration required", "schema:description": "", "schema:url": ""},
+        {"@type": "schema:CreativeWork", "schema:name": "Embargo", "schema:description": "Until 2027."},
+        {"@type": "schema:CreativeWork", "schema:name": "Terms", "schema:url": "https://repository.example/terms"},
+    ]
+    report = validate.check("CoreDiscovery", doc)
+    assert violations(report["findings"]) == []
+    kept = report["record"]["schema:conditionsOfAccess"]
+    assert kept[:2] == ["Registration required", "Embargo: Until 2027."]
+    assert kept[2]["schema:url"] == "https://repository.example/terms"
+
+
 def test_either_a_landing_page_or_a_distribution_is_reported_once():
     doc = filled()
     del doc["schema:url"]
