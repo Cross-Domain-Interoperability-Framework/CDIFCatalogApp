@@ -69,7 +69,8 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   puts its folder on the import path. New Python dependencies of a converter go in
   `server/requirements.txt` (today: `lxml`, `pyld`, `requests`).
 - **Some converters are slow or return shapes the catalog cannot take.** DDI 1.2.2 and Codebook
-  2.5 return an `@graph` of nodes, which is reported, not stored. A large FAIR2 record took over
+  2.5 return an `@graph` of nodes, which is reported, not stored. It is decided that framing is
+  the converter's job: do not add a framing step to the catalog. A large FAIR2 record took over
   a minute to convert and check.
 - **Files copied from elsewhere are not edited here.** From metadataBuildingBlocks:
   `web/public/forms/CoreDiscovery/*`, `server/app/profiles/CoreDiscovery/*` and
