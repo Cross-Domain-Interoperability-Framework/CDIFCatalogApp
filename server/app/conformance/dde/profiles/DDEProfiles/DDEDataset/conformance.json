@@ -1,0 +1,11 @@
+{
+  "$schema": "https://w3id.org/cdif/schema/conformance-declaration/0.2",
+  "conformsTo": "https://w3id.org/cdif/dde/1.0/DDEDataset",
+  "title": "DDE Dataset profile",
+  "description": "Marked by one of this profile's DDE resource type codes (dataset, dataCatalog, geographicDataset, nonGeographicDataset) in schema:additionalType on the described resource. The resource is the node with a catalog record (schema:subjectOf), so the members of a collection, which carry resource types of their own, do not count. Requires what the schema composes unconditionally. Not in an exclusiveGroup: a record with two resource types declares every profile it fits. DRAFT, generated from schema.yaml; not reviewed.",
+  "presence": "ASK {\n  ?d schema:subjectOf ?record ; schema:additionalType ?type .\n  ?type schema:inDefinedTermSet ?set ; schema:termCode ?code .\n  FILTER(STR(?set) IN (\"dde:codelist/ResourceTypeCode\", \"https://www.ddeworld.org/resource/codelist/ResourceTypeCode\"))\n  FILTER(STR(?code) IN (\"dataset\", \"dataCatalog\", \"geographicDataset\", \"nonGeographicDataset\"))\n}",
+  "validityShapes": null,
+  "requires": [
+    "https://w3id.org/cdif/core/2.0"
+  ]
+}

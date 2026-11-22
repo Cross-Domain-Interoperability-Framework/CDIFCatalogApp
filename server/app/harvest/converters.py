@@ -9,7 +9,8 @@ Each function below takes the text of one harvested document and returns one CDI
 converters are asked not to work out conformance themselves (`detect=False`). The catalog does
 that once, for every converter alike, with the same code they would have used:
 `detect_conformance.py` in the converters' own `validation` submodule (`conformance` below).
-Called from here it reads its rule files from this repository, not from GitHub.
+Which profiles it looks for is set in app/profile-sources.yaml. Called from here it reads its
+rule files from this repository, not from GitHub.
 
 Not connected yet, though a converter exists: DCAT (its entry point takes one dataset picked
 out of a graph, and a file may hold many) and SDMX (one dataflow out of a structure message).
@@ -21,6 +22,8 @@ import sys
 import tempfile
 from functools import lru_cache
 from pathlib import Path
+
+import yaml
 
 from app.harvest import HarvestError
 
@@ -49,24 +52,49 @@ def _script(relative: str):
     return module
 
 
-# The content rules detect_conformance holds a claim to, copied from metadataBuildingBlocks (see
-# app/profiles/PINNED.md). Given no local copy it would fetch them from GitHub on every record.
-SHAPES = Path(__file__).resolve().parents[1] / "conformance"
+APP = Path(__file__).resolve().parents[1]
+
+
+@lru_cache
+def sources() -> dict:
+    """The groups of profiles to look for, from app/profile-sources.yaml: only those switched
+    on, in the order written. Each group's folder holds one conformance.json per profile, copied
+    from the building block repository that defines it (see app/conformance/PINNED.md), and any
+    rule files those name. Given no local copy the script would fetch rule files from GitHub on
+    every record."""
+    listed = yaml.safe_load((APP / "profile-sources.yaml").read_text(encoding="utf-8"))
+    return {name: {**group, "folder": APP / group["folder"]} for name, group in listed.items() if group["enabled"]}
 
 
 def conformance(record: dict) -> tuple:
-    """The CDIF levels a record's content reaches, as conformance addresses: each level whose
-    marks are present in the record and whose content rules the record does not break."""
+    """The profiles a record's content reaches, as conformance addresses: each profile, in the
+    groups switched on, whose marks are present in the record, whose content rules the record
+    does not break, and whose own requirements are among what was found before it."""
     module = _script("validation/detect_conformance.py")
+    found = []
     try:
-        return tuple(module.detect_cdif_conformance(record, bb_dir=SHAPES))
+        for group in sources().values():
+            if "claims_under" in group:
+                found += module.detect_domain_conformance(
+                    record, found, group["folder"], manage_prefix=group["claims_under"]
+                ).declared
+            else:
+                found += module.detect_cdif_conformance(record, bb_dir=group["folder"], use_bb_source=True)
     except Exception as error:  # the script is not ours; whatever it raises is a failed record
-        raise HarvestError(f"Could not work out which CDIF levels the record reaches: {error}") from error
+        raise HarvestError(f"Could not work out which profiles the record reaches: {error}") from error
+    return tuple(found)
 
 
-def declare(record: dict, levels) -> dict:
-    """Write those levels into the record's catalog record, replacing any CDIF claim there."""
-    return _script("validation/detect_conformance.py").apply_conformance(record, list(levels))
+def declare(record: dict, found) -> dict:
+    """Write those addresses into the record's catalog record, replacing any claim there to a
+    profile in a group that was looked for. Other claims are kept."""
+    module = _script("validation/detect_conformance.py")
+    module.apply_conformance(record, [u for u in found if u.startswith(module.CDIF_BASE)])
+    for group in sources().values():
+        prefix = group.get("claims_under", module.CDIF_BASE)
+        if not prefix.startswith(module.CDIF_BASE):
+            module.apply_conformance(record, [u for u in found if u.startswith(prefix)], manage_prefix=prefix, append=True)
+    return record
 
 
 def _record(result) -> dict:
