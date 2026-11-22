@@ -110,7 +110,7 @@ The model is the one ckanext-harvest uses, reimplemented.
 | NASA UMM-C | `UMM/umm_to_cdif.py` | Converts; not valid (3 of 3): distributions with no download address. |
 | DDI-CDI JSON-LD | `DDI-CDI/ddicdi_jsonld_to_cdif.py` | Converts; not valid (3 of 3): a distribution name that is not text. |
 | FAIR2 | `FAIR2/fair2_to_cdif.py` | Converts; not valid (1 of 1): checksums with no algorithm. Took over a minute. |
-| DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Valid for 5 of 6: one nested record each, asked for with `framed=True`. `MWI_2024_DHS_v01_M` (Codebook 2.5) is not: its catalog record's `schema:sdDatePublished` is not a full date. Converting takes about a second; checking a large record (hundreds of variables and code lists) takes 20 to 80 seconds. |
+| DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Valid (6 of 6): one nested record each, asked for with `framed=True`. Converting takes about a second; checking a large record (hundreds of variables and code lists) takes 20 to 80 seconds. |
 | DCAT (JSON-LD, RDF/XML, Turtle), SDMX-ML | exist | Not connected: each takes one dataset or dataflow picked out of a larger document. |
 | FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI Lifecycle, OGC capabilities, STAC, CKAN, DCAT-US, NIAID | none connected | Recognised and kept as received. NIAID has a harvester script, not a converter function. |
 
