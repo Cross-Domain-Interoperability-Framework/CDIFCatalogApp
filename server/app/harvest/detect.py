@@ -174,10 +174,11 @@ def _json(text: str) -> Detected:
     def found(fmt):
         return Detected(fmt, "json-ld", declared)
 
-    if any(uri.startswith(CDIF) for uri in declared):
-        return found("cdif-jsonld")
+    # A crate made from a CDIF record keeps that record's claims, so the crate has to be asked first.
     if "w3id.org/ro/crate" in context or any(n.get("@id") == "ro-crate-metadata.json" for n in nodes):
         return found("rocrate")
+    if any(uri.startswith(CDIF) for uri in declared):
+        return found("cdif-jsonld")
     if '"fair2"' in context:  # FAIR2 builds on Croissant, so it has to be asked first
         return found("fair2")
     if any("mlcommons.org/croissant" in uri for uri in declared) or "mlcommons.org/croissant" in context:

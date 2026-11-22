@@ -59,6 +59,20 @@ def test_json_ld_that_is_not_cdif_is_told_apart():
     assert detect(json.dumps({"@context": {"ex": "https://example.org/"}, "@type": "ex:Thing"})).format == "jsonld-other"
 
 
+def test_an_ro_crate_made_from_a_cdif_record_is_still_an_ro_crate():
+    # it keeps the record's CDIF claims, but it is a flat graph that needs the converter
+    crate = {
+        "@context": ["https://w3id.org/ro/crate/1.2/context", {"dcterms": "http://purl.org/dc/terms/"}],
+        "@graph": [
+            {"@id": "ro-crate-metadata.json", "@type": "CreativeWork", "about": {"@id": "./"},
+             "additionalType": "dcat:CatalogRecord", "dcterms:conformsTo": [{"@id": CORE}]},
+            {"@id": "./", "@type": "Dataset", "name": "x"},
+        ],
+    }
+    found = detect(json.dumps(crate))
+    assert found.format == "rocrate" and found.conforms_to == (CORE,)
+
+
 def test_a_schema_org_record_that_declares_cdif_is_cdif():
     assert detect(ld(**{"@type": "schema:Dataset", "schema:subjectOf": record([CORE])})).format == "cdif-jsonld"
 
