@@ -25,7 +25,7 @@ Records and the sitemap. Do not start those without being asked.
 Everything runs in Docker. There is no local Python or Node setup to rely on.
 
 ```bash
-git submodule update --init          # once after cloning: fetches server/converters
+git submodule update --init --recursive   # once after cloning: fetches server/converters and the validation repository inside it
 docker compose up --build            # db, api (8000), worker, web (5173); open http://127.0.0.1:5173
 docker compose exec api pytest       # server tests; they need the database, so run them here
 docker compose up -d --build api worker   # after changing server/requirements*.txt
@@ -60,11 +60,17 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   issue for the `converters` repository. To move to a newer commit: `git -C server/converters
   fetch && git -C server/converters checkout <commit>`, run the tests, then commit the submodule
   pointer. `test_converters.py` runs the real converters on their own examples and fails if the
-  submodule is missing or a converter's call signature has changed. Its nested `validation`
-  submodule is deliberately not fetched; the converters are called with `detect=False`.
-- **A converted record gets the catalog's own conformance claim** (`validate.declare`) before it
-  is checked, because the catalog made the record. A CDIF record that was harvested as CDIF
-  keeps exactly what it declared.
+  submodule is missing or a converter's call signature has changed.
+- **A converted record's conformance claim comes from `detect_conformance.py`**, in the
+  converters' nested `validation` submodule, which must be fetched (`--recursive`). The
+  catalog calls it once after converting (`convert.claim`); the converters are still called
+  with `detect=False`. It is given `server/app/conformance/` for its rule files. Without that
+  it fetches them from GitHub's `main` on every record, so a test fails if the script names a
+  rule file that is not held there. A CDIF record that was harvested as CDIF keeps exactly
+  what it declared.
+- **The validation repository has tests of its own**, which need files the catalog does not
+  hold. `server/pytest.ini` limits collection to `tests`; it is baked into the image, so a
+  change to it needs the image rebuilt.
 - **The converters are scripts, not a package.** `converters.py` loads each from its file and
   puts its folder on the import path. New Python dependencies of a converter go in
   `server/requirements.txt` (today: `lxml`, `pyld`, `requests`).
@@ -73,13 +79,18 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   the converter's job: do not add a framing step to the catalog. A large FAIR2 record took over
   a minute to convert and check.
 - **Files copied from elsewhere are not edited here.** From metadataBuildingBlocks:
-  `web/public/forms/CoreDiscovery/*`, `server/app/profiles/CoreDiscovery/*` and
-  `server/tests/fixtures/CoreDiscovery/*`. From SEMIC: `server/tests/fixtures/shapes/*`. Each has a `PINNED.md` naming the commit and the refresh
+  `web/public/forms/CoreDiscovery/*`, `server/app/profiles/{CoreDiscovery,cdifCore}/*` and
+  `server/tests/fixtures/{CoreDiscovery,cdifCore}/*`. From SEMIC: `server/tests/fixtures/shapes/*`. Each has a `PINNED.md` naming the commit and the refresh
   steps. Refresh the form files and the validation files together, or the form and the validator
   disagree. A defect in them is an issue for metadataBuildingBlocks, not a local patch.
 - **Do not write a conformance address or its version in code.** `validate.load` reads them from
-  the pinned schema, and a test fails if `/2.0` appears in `validate.py`. They moved from 1.1 to
-  2.0 once already.
+  the pinned schema (or, for a single level such as `cdifCore`, the `conformance.json` beside
+  it), and a test fails if `/2.0` appears in `validate.py`. They moved from 1.1 to 2.0 once already.
+- **A form record claims the level its content reaches** (`validate.level_for`): the installed
+  profile with the fewest claims that has every field the record fills. Do not list the fields
+  that raise the level in code; they are the difference between the pinned schemas. Each
+  installed profile needs its own `server/app/messages/<profile>.json`. Converted records are
+  levelled by `detect_conformance.py` instead; the two agree on core and discovery today.
 - **The `schema` prefix is `http://schema.org/`, not `https`.** With the `https` form a record
   reads as empty to the SHACL rules and reports nothing. `prepare` overwrites the prefixes with
   the ones the schema pins.

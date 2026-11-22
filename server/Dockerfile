@@ -4,7 +4,7 @@ WORKDIR /srv
 COPY requirements.txt requirements-dev.txt pytest.ini ./
 RUN pip install --no-cache-dir -r requirements-dev.txt
 COPY app ./app
-# The CDIF converters, a git submodule: run `git submodule update --init` before building.
+# The CDIF converters, a git submodule: run `git submodule update --init --recursive` before building.
 COPY converters ./converters
 COPY tests ./tests
 EXPOSE 8000

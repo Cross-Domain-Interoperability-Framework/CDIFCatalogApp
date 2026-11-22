@@ -36,6 +36,23 @@ def test_the_profiles_own_examples_pass_unaltered(name):
 def test_failing_cases_fail_for_their_named_reason(name, prop):
     found = validate.schema_findings(SPEC, fixture(name))
     assert [f["path"] for f in found] == [[prop]]
+
+
+CORE = validate.load("cdifCore")
+CORE_FIXTURES = FIXTURES.parent / "cdifCore"
+
+
+@pytest.mark.parametrize("name", ["exampleCdifCore.json", "exampleCdifCoreComplete.json", "exampleCdifCoreMinimal.json"])
+def test_the_core_levels_own_examples_pass_unaltered(name):
+    record = json.loads((CORE_FIXTURES / name).read_text(encoding="utf-8"))
+    assert validate.schema_findings(CORE, record) == []
+    assert violations(validate.shacl_findings(CORE, record)) == []
+
+
+@pytest.mark.parametrize("name, prop", [("name-fail.json", "schema:name"), ("dateModified-fail.json", "schema:dateModified")])
+def test_the_core_levels_failing_cases_fail_for_their_named_reason(name, prop):
+    found = validate.schema_findings(CORE, json.loads((CORE_FIXTURES / name).read_text(encoding="utf-8")))
+    assert [f["path"] for f in found] == [[prop]]
     assert found[0]["message"] == "should be text"
 
 
@@ -134,9 +151,46 @@ def test_the_server_writes_the_catalog_record_and_reads_conformance_from_the_sch
     assert about["schema:about"] == {"@id": record["@id"]}
     assert about["schema:maintainer"]["schema:name"] == "A Curator"  # the author's entry survives
     declared = [c["@id"] for c in about["dcterms:conformsTo"]]
-    assert declared == SPEC["conformance"] and len(declared) == 2
+    assert declared == CORE["conformance"] and len(declared) == 1  # the author's made-up claim is gone
     # no version number is written in the code: it comes from the pinned schema
     assert "/2.0" not in Path(validate.__file__).read_text(encoding="utf-8")
+
+
+DISCOVERY_FIELDS = ["schema:variableMeasured", "schema:measurementTechnique", "schema:spatialCoverage",
+                    "schema:temporalCoverage", "dqv:hasQualityMeasurement"]
+
+
+def claims(report):
+    return [c["@id"] for c in report["record"]["schema:subjectOf"]["dcterms:conformsTo"]]
+
+
+def test_the_fields_that_raise_the_level_are_read_from_the_pinned_schemas():
+    assert sorted(set(SPEC["fields"]) - set(CORE["fields"])) == sorted(DISCOVERY_FIELDS)
+    assert set(CORE["conformance"]) < set(SPEC["conformance"])
+
+
+def test_a_record_with_core_content_claims_core_only():
+    doc = filled()
+    doc["schema:variableMeasured"] = []  # untouched fields the form leaves behind do not count
+    doc["schema:spatialCoverage"] = [{"@type": "schema:Place"}]
+    report = validate.check("CoreDiscovery", doc)
+    assert report["valid"] is True and claims(report) == CORE["conformance"]
+
+
+@pytest.mark.parametrize("field", DISCOVERY_FIELDS)
+def test_filling_a_discovery_field_adds_the_discovery_claim_and_its_checks(field):
+    doc = filled()
+    doc[field] = fixture("exampleCDIFDiscoveryComplete.json")[field]
+    report = validate.check("CoreDiscovery", doc)
+    assert violations(report["findings"]) == []
+    assert claims(report) == SPEC["conformance"] and len(claims(report)) == 2
+
+
+def test_a_discovery_field_filled_in_wrongly_is_still_reported():
+    doc = filled()
+    doc["schema:temporalCoverage"] = [17]
+    found = violations(validate.check("CoreDiscovery", doc)["findings"])
+    assert [f["property"] for f in found] == ["schema:temporalCoverage"]
 
 
 def test_strip_empty():
@@ -156,7 +210,8 @@ def test_the_profile_to_check_against_follows_what_the_record_declares():
     core, discovery = "https://w3id.org/cdif/core/2.0", "https://w3id.org/cdif/discovery/2.0"
     assert set(validate.load("CoreDiscovery")["conformance"]) == {core, discovery}
     assert validate.profile_for([core, discovery, "https://w3id.org/cdif/data_description/2.0"], "Fallback") == "CoreDiscovery"
-    assert validate.profile_for([core], "Fallback") == "Fallback"  # declares less than the profile asks
+    assert validate.profile_for([core], "Fallback") == "cdifCore"
+    assert validate.profile_for([discovery], "Fallback") == "Fallback"  # declares less than any profile asks
     assert validate.profile_for([], "Fallback") == "Fallback"
 
 
@@ -165,16 +220,21 @@ def rule_messages(profile):
     return {" ".join(str(o).split()) for o in validate.load(profile)["shapes"].objects(None, sh.message)}
 
 
-def test_every_rule_message_has_a_plain_language_version():
+PROFILES = ["CoreDiscovery", "cdifCore"]
+
+
+@pytest.mark.parametrize("profile", PROFILES)
+def test_every_rule_message_has_a_plain_language_version(profile):
     # After the pinned rules are refreshed, a new or reworded message fails here until it is rewritten.
-    plain = validate.plain_messages("CoreDiscovery")
-    assert sorted(rule_messages("CoreDiscovery") - set(plain)) == []
-    assert sorted(set(plain) - rule_messages("CoreDiscovery")) == []  # no entries for rules that are gone
+    plain = validate.plain_messages(profile)
+    assert sorted(rule_messages(profile) - set(plain)) == []
+    assert sorted(set(plain) - rule_messages(profile)) == []  # no entries for rules that are gone
 
 
-def test_plain_messages_use_no_schema_terms():
+@pytest.mark.parametrize("profile", PROFILES)
+def test_plain_messages_use_no_schema_terms(profile):
     jargon = ("schema:", "dcterms:", "skos:", "prov:", "dcat:", "spdx:", "@id", "IRI", "PropertyValue", "DefinedTerm", "node")
-    for message in validate.plain_messages("CoreDiscovery").values():
+    for message in validate.plain_messages(profile).values():
         assert not [word for word in jargon if word in message], message
         assert message[0].isupper() and message.endswith("."), message
 
