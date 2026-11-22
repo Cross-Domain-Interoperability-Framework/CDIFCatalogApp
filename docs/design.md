@@ -110,7 +110,7 @@ The model is the one ckanext-harvest uses, reimplemented.
 | NASA UMM-C | `UMM/umm_to_cdif.py` | Converts; not valid (3 of 3): distributions with no download address. |
 | DDI-CDI JSON-LD | `DDI-CDI/ddicdi_jsonld_to_cdif.py` | Converts; not valid (3 of 3): a distribution name that is not text. |
 | FAIR2 | `FAIR2/fair2_to_cdif.py` | Converts; not valid (1 of 1): checksums with no algorithm. Took over a minute. |
-| DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Converts, but to a graph of separate nodes. Framing is the converter's job (see the decision below), so this is reported, not stored as CDIF, until the converter returns a nested record. Slow: 6 to 25 seconds a record. |
+| DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Valid for 5 of 6: one nested record each, asked for with `framed=True`. `MWI_2024_DHS_v01_M` (Codebook 2.5) is not: its catalog record's `schema:sdDatePublished` is not a full date. Converting takes about a second; checking a large record (hundreds of variables and code lists) takes 20 to 80 seconds. |
 | DCAT (JSON-LD, RDF/XML, Turtle), SDMX-ML | exist | Not connected: each takes one dataset or dataflow picked out of a larger document. |
 | FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI Lifecycle, OGC capabilities, STAC, CKAN, DCAT-US, NIAID | none connected | Recognised and kept as received. NIAID has a harvester script, not a converter function. |
 
@@ -217,7 +217,7 @@ Harvest-edit is its own named permission, so it can be granted to another group 
 
 > **Decided:** a web folder source picks up files ending in `.json`, `.jsonld`, `.xml`, `.ttl` and `.rdf` unless its settings list others. What each file is comes from its content, not its ending.
 
-> **Decided:** framing happens in the converter. A converter hands the catalog one nested record per dataset, not a graph of separate nodes. The catalog does not frame; a converter that returns a graph is reported and its record is not stored as CDIF. Today that is the DDI 1.2.2 and DDI Codebook 2.5 converters, which need changing in the `converters` repository ([converters issue 38](https://github.com/Cross-Domain-Interoperability-Framework/converters/issues/38)).
+> **Decided:** framing happens in the converter. A converter hands the catalog one nested record per dataset, not a graph of separate nodes. The catalog does not frame; a converter that returns a graph is reported and its record is not stored as CDIF. The DDI 1.2.2 and DDI Codebook 2.5 converters used to; they now return one nested record when called with `framed=True` ([converters issue 38](https://github.com/Cross-Domain-Interoperability-Framework/converters/issues/38)).
 
 > **Decided:** the converters are brought in as a git submodule for now. For production they should become an installed package; `server/app/harvest/converters.py` is the only module that would change.
 

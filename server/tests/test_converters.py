@@ -49,6 +49,18 @@ def test_each_iso_flavour_converts_to_a_record_that_passes_the_profile(fmt):
     assert record["schema:name"] and record["@id"]
 
 
+@pytest.mark.parametrize("folder, pattern, fmt", [
+    ("DDI/Examples/XML", "MWI-CHLINELIST-*.xml", "ddi-1.2.2"),
+    ("DDICodebook/Examples/XML", "dataverse-*.xml", "ddi-codebook-2.5"),
+])
+def test_each_ddi_codebook_version_converts_to_one_nested_record_that_passes_the_profile(folder, pattern, fmt):
+    # framed=True: the code lists are embedded in the record, not separate nodes of a graph
+    text = of_format(folder, pattern, fmt)
+    record = validate.declare("CoreDiscovery", convert.to_cdif(detect(text), text))
+    assert "@graph" not in record and record["schema:variableMeasured"]
+    assert validate.check_record("CoreDiscovery", record)["valid"] is True
+
+
 def test_a_ddi_cdi_xml_record_converts_to_a_record_that_passes_the_profile():
     text = of_format("DDI-CDI/Examples", "*.xml", "ddicdi-xml")
     record = validate.declare("CoreDiscovery", convert.to_cdif(detect(text), text))
@@ -81,7 +93,7 @@ def test_a_converter_that_fails_is_reported_in_words_not_as_a_crash(monkeypatch)
 
 
 def test_a_converter_that_returns_a_graph_of_nodes_is_reported(monkeypatch):
-    # the DDI converters do this: the dataset plus its code lists as separate nodes
+    # as the DDI converters did before they were asked for framed=True
     monkeypatch.setitem(convert.CONVERTERS, "ddi-1.2.2", lambda content: {"@context": {}, "@graph": [{}, {}, {}]})
     with pytest.raises(HarvestError, match="graph of 3 nodes"):
         convert.to_cdif(Detected("ddi-1.2.2", "xml"), "<codeBook/>")
