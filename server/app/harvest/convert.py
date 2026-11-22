@@ -33,9 +33,9 @@ def to_cdif(detected: Detected, content: str) -> dict:
         except Exception as e:  # the converters are scripts written for well-formed input
             raise HarvestError(f"Recognised as {detected.label}, but it could not be converted to CDIF: {type(e).__name__}: {e}")
         if "@graph" in record:
-            # Some converters (DDI) return the dataset with its code lists as separate nodes. The
-            # catalog checks and stores one nested record. Making one (framing) is the converter's
-            # job by decision, so there is no framing step here.
+            # The catalog checks and stores one nested record. Making one (framing) is the
+            # converter's job by decision, so there is no framing step here; a converter that
+            # returns a graph of separate nodes is reported.
             raise HarvestError(
                 f"Recognised as {detected.label} and converted, but the result is a graph of "
                 f"{len(record['@graph'])} nodes. The catalog takes one nested record; the converter needs to frame its result."

@@ -152,14 +152,16 @@ def umm(content: str) -> dict:
     return _record(_script("UMM/umm_to_cdif.py").convert_umm_to_cdif(document, meta=meta, detect=False))
 
 
+# framed=True: one record rooted at the dataset, each code list embedded where it is first used,
+# instead of a graph of the dataset and its code lists as separate nodes (converters issue 38).
 def ddi_122(content: str) -> dict:
     module = _script("DDI/ddi_sssom_to_cdif.py")
-    return _via_file(content, ".xml", lambda path: module.convert(path, version="122", detect=False))
+    return _via_file(content, ".xml", lambda path: module.convert(path, version="122", detect=False, framed=True))
 
 
 def ddi_25(content: str) -> dict:
     module = _script("DDI/ddi_sssom_to_cdif.py")
-    return _via_file(content, ".xml", lambda path: module.convert(path, version="25", detect=False))
+    return _via_file(content, ".xml", lambda path: module.convert(path, version="25", detect=False, framed=True))
 
 
 def ddicdi_xml(content: str) -> dict:
