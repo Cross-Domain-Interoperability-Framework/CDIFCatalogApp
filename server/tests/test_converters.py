@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 import pytest
+import yaml
 
 from app import validate
 from app.harvest import HarvestError, convert, converters
@@ -132,11 +133,85 @@ def test_a_level_whose_content_rules_are_broken_is_not_claimed():
     assert "https://w3id.org/cdif/provenance/2.0" not in reached  # but a method must have a name
 
 
-def test_every_rule_file_the_detection_names_is_held_here_so_none_is_fetched():
+LISTED = yaml.safe_load((converters.APP / "profile-sources.yaml").read_text(encoding="utf-8"))
+DDE = "https://w3id.org/cdif/dde/1.0/"
+
+
+def described(group):
+    folder = converters.APP / LISTED[group]["folder"]
+    return folder, [json.loads(f.read_text(encoding="utf-8")) for f in sorted(folder.rglob("conformance.json"))]
+
+
+def switched_on(monkeypatch, *names):
+    """Look for these groups, whatever the list says."""
+    on = {n: {**LISTED[n], "folder": converters.APP / LISTED[n]["folder"]} for n in LISTED if n in names}
+    monkeypatch.setattr(converters, "sources", lambda: on)
+
+
+def held_example(name):
+    return json.loads((Path(__file__).parent / "fixtures" / name).read_text(encoding="utf-8"))
+
+
+def test_the_list_of_profiles_looks_for_the_cdif_levels_first_and_only_those_unless_changed():
+    assert list(LISTED)[0] == "cdif" and "claims_under" not in LISTED["cdif"]
+    assert [name for name, group in LISTED.items() if group["enabled"]] == ["cdif"]
+    assert list(converters.sources()) == ["cdif"]
+    for name, group in LISTED.items():
+        folder, profiles = described(name)
+        assert profiles, name
+        addresses = [p["conformsTo"] for p in profiles]
+        assert len(set(addresses)) == len(addresses), name  # one description per address
+        if "claims_under" in group:
+            assert [a for a in addresses if not a.startswith(group["claims_under"])] == [], name
+
+
+@pytest.mark.parametrize("group", list(LISTED))
+def test_every_rule_file_a_profile_names_is_held_here_so_none_is_fetched(group):
+    folder, profiles = described(group)
+    named = sorted(p["validityShapes"] for p in profiles if p.get("validityShapes"))
+    assert [n for n in named if not (folder / n).is_file()] == []
+    assert sorted(f.relative_to(folder).as_posix() for f in folder.rglob("*.shacl")) == named
+
+
+def test_the_cdif_group_holds_every_level_the_script_itself_knows():
     module = converters._script("validation/detect_conformance.py")
-    named = sorted(c["shacl"] for c in module.CONFORMANCE_CLASSES if c["shacl"])
-    assert named and [n for n in named if not (converters.SHAPES / n).is_file()] == []
-    assert sorted(p.relative_to(converters.SHAPES).as_posix() for p in converters.SHAPES.rglob("*.shacl")) == named
+    held = {p["conformsTo"] for p in described("cdif")[1]}
+    assert sorted({c["uri"] for c in module.CONFORMANCE_CLASSES} - held) == []
+
+
+def test_a_cdif_profile_beyond_the_six_levels_is_found():
+    assert "https://w3id.org/cdif/access/2.0" in converters.conformance(held_example("cdifAccess/exampleCdifAccess.json"))
+
+
+def test_a_group_switched_off_is_not_looked_for_and_its_claims_are_left_alone():
+    record = held_example("dde/exampleDDEDataset.json")
+    found = converters.conformance(record)
+    assert CORE in found and [u for u in found if u.startswith(DDE)] == []
+
+
+@pytest.mark.parametrize("name, expected", [
+    ("exampleDDEDataset.json", {"DDEDataset", "DDEDiscovery"}),
+    # two resource types: every profile the content fits is claimed
+    ("exampleDDEFunctionalResource.json", {"DDEFunctionalResource", "DDESoftware", "DDEDiscovery"}),
+    ("exampleDDECollection.json", {"DDECollection", "DDEDiscovery"}),
+])
+def test_with_the_dde_group_switched_on_a_record_claims_every_dde_profile_it_fits(monkeypatch, name, expected):
+    switched_on(monkeypatch, "cdif", "dde")
+    record = held_example("dde/" + name)
+    declared = {c["@id"] for c in record["schema:subjectOf"]["dcterms:conformsTo"] if c["@id"].startswith(DDE)}
+    found = converters.conformance(record)
+    assert {u[len(DDE):] for u in found if u.startswith(DDE)} == expected
+    assert declared <= set(found)  # what the example says of itself is among them
+    written = [c["@id"] for c in converters.declare(record, found)["schema:subjectOf"]["dcterms:conformsTo"]]
+    assert written == list(found)
+
+
+def test_a_dde_profile_is_not_claimed_without_what_it_requires(monkeypatch):
+    switched_on(monkeypatch, "cdif", "dde")
+    record = held_example("dde/exampleDDECollection.json")
+    del record["schema:hasPart"]  # no members listed, so no manifest level to build on
+    found = converters.conformance(record)
+    assert DDE + "DDECollection" not in found and DDE + "DDEDiscovery" in found
 
 
 def test_a_record_that_reaches_no_level_gets_the_fallback_claim_so_the_check_can_say_why():

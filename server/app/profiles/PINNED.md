@@ -25,12 +25,8 @@ commit, or that comparison is between two different versions.
 
 ## Content rules for working out a converted record's claim
 
-`server/app/conformance/cdifDataType/<block>/rules.shacl`, for `cdifInstanceVariable`,
-`cdifDataStructureComponent` and `cdifProvActivity`: copied unchanged from
-`_sources/cdifDataType/<block>/rules.shacl` at the same commit. They are the files
-`detect_conformance.py` (in the converters' `validation` submodule) names for the data
-description, data structure and provenance levels. When that script names another, copy it here
-too; a test fails until then.
+These moved to `server/app/conformance/cdif/`, with the files that describe each profile. See
+`server/app/conformance/PINNED.md`. Pin them from the same commit as the profiles here.
 
 Do not edit these files here. To refresh: copy `schema.json`, regenerate `rules.shacl`, copy the
 examples and `tests/*-fail.json` into the fixtures folder, update the commit above, and run the

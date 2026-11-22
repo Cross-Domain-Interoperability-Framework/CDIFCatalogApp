@@ -1,0 +1,29 @@
+# The profiles the catalog looks for in a record it has converted from another format.
+#
+# Each entry is a group of profiles from one building block repository. Set `enabled` to true
+# or false to look for that group or not. The groups are tried in the order written, and a
+# group may need what an earlier one found, so keep `cdif` first.
+#
+#   folder        where the group's profiles are described, under server/app. Every
+#                 conformance.json in it is one profile: its address, how to recognise its
+#                 content in a record, and what the record must already claim. To add or drop
+#                 a single profile, add or delete its conformance.json.
+#   claims_under  for a group that builds on the CDIF levels: the start of the addresses its
+#                 profiles claim. Leave it out for the CDIF levels themselves.
+#
+# Where the files come from, and how to refresh them, is in app/conformance/PINNED.md.
+# The worker and the api read this file once, when they start: restart them after a change.
+
+cdif:
+  enabled: true
+  folder: conformance/cdif
+
+dde:
+  enabled: false
+  folder: conformance/dde
+  claims_under: https://w3id.org/cdif/dde/
+
+geochem:
+  enabled: false
+  folder: conformance/geochem
+  claims_under: https://w3id.org/geochem/metadata/profiles/

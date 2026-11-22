@@ -64,9 +64,14 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
 - **A converted record's conformance claim comes from `detect_conformance.py`**, in the
   converters' nested `validation` submodule, which must be fetched (`--recursive`). The
   catalog calls it once after converting (`convert.claim`); the converters are still called
-  with `detect=False`. It is given `server/app/conformance/` for its rule files. Without that
-  it fetches them from GitHub's `main` on every record, so a test fails if the script names a
-  rule file that is not held there. A CDIF record that was harvested as CDIF keeps exactly
+  with `detect=False`. Which profiles it looks for is set in
+  `server/app/profile-sources.yaml`: groups by building block repository, CDIF on, DDE and
+  geochem off. Each group's folder under `server/app/conformance/` holds a `conformance.json`
+  per profile and the rule files those name, so nothing is fetched from GitHub; a test fails
+  if a named rule file is missing. The list is read once: restart `api` and `worker` after
+  changing it. Several of those files are drafts not yet in their home repositories, and the
+  geochem group declares nothing until its files require the 2.0 levels
+  (`server/app/conformance/PINNED.md`). A CDIF record that was harvested as CDIF keeps exactly
   what it declared.
 - **The validation repository has tests of its own**, which need files the catalog does not
   hold. `server/pytest.ini` limits collection to `tests`; it is baked into the image, so a

@@ -141,6 +141,8 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `app/profiles/<profile>/schema.json` | A profile's JSON Schema, copied from metadataBuildingBlocks. Two are held: `CoreDiscovery` and the core level alone, `cdifCore`. |
 | `app/profiles/<profile>/rules.shacl` | The profile's SHACL rules, generated in metadataBuildingBlocks. |
 | `app/profiles/cdifCore/conformance.json` | The core level's conformance address, copied from metadataBuildingBlocks. Its schema does not name it. |
+| `app/profile-sources.yaml` | The profiles looked for in a converted record, in groups that can be switched on and off: CDIF (on), DDE and geochemistry (off). |
+| `app/conformance/<group>/` | What describes each profile in a group: a `conformance.json` per profile, copied from its building block repository, and the rule files those name. `PINNED.md` there says where each came from. |
 | `app/profiles/PINNED.md` | Which commit those files come from and how to refresh them. |
 | `tests/test_*.py` | The tests, one file per module. Those that need a real database fail, not skip, without one. None uses the network. |
 | `tests/fixtures/shapes/` | The SHACL shapes SEMIC publishes for DCAT-AP 3.0.0 and GeoDCAT-AP 3.0.0. The DCAT output must pass them. `PINNED.md` says where they came from. |
