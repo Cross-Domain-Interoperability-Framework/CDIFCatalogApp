@@ -121,3 +121,11 @@ def submit_draft(draft_id: UUID) -> dict:
         if report["valid"]:
             conn.execute("UPDATE drafts SET status = 'submitted', updated_at = now() WHERE id = %s", (draft_id,))
     return {"submitted": report["valid"], **report}
+
+
+# In the deployed image the built web app sits beside the server, which serves it (WEB_DIR, set in
+# deploy/Dockerfile). In development Vite serves it. Mounted last, so every route above wins.
+if os.environ.get("WEB_DIR"):
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/", StaticFiles(directory=os.environ["WEB_DIR"], html=True), name="web")

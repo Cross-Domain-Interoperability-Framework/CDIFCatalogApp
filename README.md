@@ -103,6 +103,9 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `CLAUDE.md` | Working notes for AI coding assistants: commands, conventions and known traps. |
 | `LICENSE` | Apache License 2.0. |
 | `docker-compose.yml` | The four services (`db`, `api`, `worker`, `web`) for local development. Reads an optional `.env`. |
+| `render.yaml` | What Render creates to put the catalog online for colleagues: one web service and one database. See `docs/deploy-render.md`. |
+| `deploy/Dockerfile` | The image for that service: the built web app and the server in one container, with the harvest worker beside it. |
+| `.dockerignore` | What is left out when that image is built. |
 | `.github/workflows/ci.yml` | On every pull request: builds the web app and runs the server tests against PostgreSQL. |
 | `.gitignore` | Keeps `.env`, `node_modules/`, build output and caches out of the repository. |
 
@@ -114,6 +117,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `user-guide.md` | A guide for someone new to the catalog: what it is for, how CDIF profiles stack, and how to read records, fill in the form and harvest. |
 | `form-inventory.md` | What is wrong with the stock generated form, found by using it, and the five issues raised with metadataBuildingBlocks. |
 | `setup-sandboxes.md` | How to register an ORCID sandbox client, and when a DataCite test account is needed. |
+| `deploy-render.md` | How to put the catalog on Render, what its free plans mean, and what has not been checked. |
 
 ### `server/` — the API (Python, FastAPI)
 

@@ -1,0 +1,8 @@
+# Only deploy/Dockerfile builds from the repository root.
+.git
+**/.git
+.env
+**/node_modules
+web/dist
+**/__pycache__
+**/.pytest_cache
