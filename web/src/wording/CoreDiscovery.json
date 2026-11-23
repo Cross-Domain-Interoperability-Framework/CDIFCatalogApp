@@ -11,10 +11,6 @@
     "label": "Identifier (DOI)",
     "help": "The dataset's permanent identifier, written as a full address such as https://doi.org/10.1234/abcd."
   },
-  "@type": {
-    "label": "Kind of resource",
-    "help": "Leave as Dataset unless you are describing something else, such as software or a document."
-  },
   "schema:datePublished": {
     "label": "Date published",
     "help": "When the dataset was first made available."
@@ -29,7 +25,7 @@
   },
   "schema:inLanguage": {
     "label": "Language",
-    "help": "The language of the data, as a short code. For example: en."
+    "help": "The language of the data. Choose one from the list, or type another."
   },
   "schema:additionalType": {
     "label": "More specific kinds",

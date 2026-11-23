@@ -145,7 +145,8 @@ Seen in the browser on the first record:
   same day in `web/src/corrections.js`, which takes that default out when the form loads.
 - **The form shows its own count of faults** as a red badge beside a list (5 beside three
   variables) while the server reports nothing to fix.
-- **"Kind of resource" shows `schema:Dataset`** as its value.
+- **"Kind of resource" showed `schema:Dataset`** as its value. The field was taken out of the
+  form the same day (`web/src/corrections.js`): the form describes datasets only.
 - The landing page is marked "is a required property" on a blank form (section A).
 
 ## Found for metadataBuildingBlocks
