@@ -3,6 +3,7 @@ import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
 import Account from './Account.jsx';
+import Completeness from './Completeness.jsx';
 import { correctDefaults, correctLayout, correctSchema } from './corrections.js';
 import DoiPrefill from './DoiPrefill.jsx';
 import Drafts from './Drafts.jsx';
@@ -291,6 +292,7 @@ export default function App() {
       ))}
       <Drafts current={openId} onOpen={open} />
       <DoiPrefill data={data} defaults={form.defaults} onFill={fill} />
+      <Completeness data={data} defaults={form.defaults} fields={fields} />
       <Box sx={{ my: 2 }}>
         <JsonForms
           key={formKey}

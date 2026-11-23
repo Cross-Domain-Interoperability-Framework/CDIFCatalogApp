@@ -285,7 +285,7 @@ As of 23 November 2026. The work did not follow the order above: the spike was b
 
 | Step | Stands at | Built | Not built |
 |---|---|---|---|
-| 1. Spike | Days 1 to 8 built, with two gaps. Day 10 not started, so the spike's question is unanswered. | See the day-by-day table. | The scientist sessions, and the go or no-go. |
+| 1. Spike | Days 1 to 8 built, with one gap (no table of saved versions). Day 10 not started, so the spike's question is unanswered. | See the day-by-day table. | The scientist sessions, and the go or no-go. |
 | 2. Pipeline and store | Partly built. | The `records` and harvest tables; a worker; web folder harvesting; recognising a format from content; 14 formats connected to converters; conformance worked out from content; validation, with invalid records stored but not served. | The other connectors (sitemap, CSW, OAI-PMH, CKAN, STAC, DCAT, file upload). The 121 ADA records have not been reproduced. Re-converting stored records after a converter is corrected. |
 | 3. Search and record pages | A small part. | A record address that answers by `Accept` header or `format` parameter, with a plain summary page. | Search of any kind, the search row, the search page, the designed record page, the sitemap, OGC API Records. |
 | 4. ISO output and CSW | Not started. | | All of it. |
@@ -373,7 +373,7 @@ Where each day stands on 23 November 2026:
 | 4–5 | Done. |
 | 6 | Done. |
 | 7 | Done. |
-| 8 | Report done. The completeness indicator is not built. |
+| 8 | Done. The completeness indicator, added on 23 November 2026, counts the fields filled in, overall and tab by tab; it does not weigh required fields above optional ones. |
 | 9 | Done on 23 November 2026, by script and not by hand: all five example records submit valid. What could not be entered, and what a person would trip on, is in `docs/form-inventory.md`. |
 | 10 | Not held. How to run the sessions, with the task sheet, the observation sheet and the result page, is in `docs/scientist-sessions.md`. |
 
