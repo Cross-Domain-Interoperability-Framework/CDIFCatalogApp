@@ -46,7 +46,7 @@ FORMATS = {
     "fgdc": ("FGDC CSDGM XML", None),
     "arcgis": ("ArcGIS metadata XML", None),
     "eml": ("EML XML", None),
-    "datacite-xml": ("DataCite XML", None),
+    "datacite-xml": ("DataCite XML", "DataCite/datacite_to_cdif.py"),
     "dublin-core": ("Dublin Core XML", None),
     "ddi-1.2.2": ("DDI 1.2.2 XML", "DDI/ddi122_to_cdif.py"),
     "ddi-codebook-2.5": ("DDI Codebook 2.5 XML", "DDICodebook/ddi25_to_cdif.py"),

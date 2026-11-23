@@ -112,7 +112,8 @@ The model is the one ckanext-harvest uses, reimplemented.
 | FAIR2 | `FAIR2/fair2_to_cdif.py` | Converts; not valid (1 of 1): checksums with no algorithm. Took over a minute. |
 | DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Valid (6 of 6): one nested record each, asked for with `framed=True`. Converting takes about a second; checking a large record (hundreds of variables and code lists) takes 20 to 80 seconds. |
 | DCAT (JSON-LD, RDF/XML, Turtle), SDMX-ML | exist | Not connected: each takes one dataset or dataflow picked out of a larger document. |
-| FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI Lifecycle, OGC capabilities, STAC, CKAN, DCAT-US, NIAID | none connected | Recognised and kept as received. NIAID has a harvester script, not a converter function. |
+| DataCite XML (kernel 3 and 4), one record per file | `DataCite/datacite_to_cdif.py` | Valid (50 of 50) against the profile each reaches: 12 reach discovery, 38 core only. A record inside an OAI-PMH response is not connected. |
+| FGDC, ArcGIS, EML, DataCite JSON, Dublin Core, DDI Lifecycle, OGC capabilities, STAC, CKAN, DCAT-US, NIAID | none connected | Recognised and kept as received. NIAID has a harvester script, not a converter function. |
 
 The "not valid" rows are for the `converters` and `metadataBuildingBlocks` repositories to settle: either the converter's output or the profile the catalog pins is behind the other. They are not patched here.
 - **`robots.txt` is obeyed**, including its crawl delay, unless a source's settings say to ignore it. A closed subfolder or file is skipped; a closed starting point fails the run.

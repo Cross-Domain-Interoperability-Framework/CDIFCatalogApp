@@ -67,6 +67,20 @@ def test_a_ddi_cdi_xml_record_converts_to_a_record_that_passes_the_profile():
     assert validate.check_record("CoreDiscovery", record)["valid"] is True
 
 
+def test_a_datacite_record_converts_to_a_record_that_passes_the_profile_it_reaches():
+    text = of_format("DataCite/examples", "*.xml", "datacite-xml")
+    record, profile = convert.claim(convert.to_cdif(detect(text), text), "CoreDiscovery")
+    assert validate.check_record(profile, record)["valid"] is True
+    assert record["schema:name"] and record["@id"].startswith("http")
+
+
+def test_a_file_of_several_datacite_records_is_refused_in_words():
+    one = of_format("DataCite/examples", "*.xml", "datacite-xml")
+    one = one[one.index("<resource"):] if "<resource" in one else one[one.index("?>") + 2:]
+    with pytest.raises(HarvestError, match="2 DataCite records"):
+        converters.datacite(f"<records>{one}{one}</records>")
+
+
 @pytest.mark.parametrize("folder, pattern, fmt", [
     ("soso", "*.json", "schemaorg-jsonld"),
     ("croissant", "*.jsonld", "croissant"),
