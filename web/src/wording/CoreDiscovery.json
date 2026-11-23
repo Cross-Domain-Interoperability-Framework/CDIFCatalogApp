@@ -130,9 +130,17 @@
   "schema:conditionsOfAccess/schema:description": { "label": "Description" },
   "schema:conditionsOfAccess/schema:url": { "label": "Web address" },
   "schema:distribution": {
-    "label": "Downloads and services",
-    "help": "Each file that can be downloaded, or web service that gives access to the data."
+    "label": "Downloads",
+    "help": "Each file that can be downloaded, with the web address it is fetched from."
   },
+  "schema:distribution/schema:name": { "label": "File name or title", "help": "A short name for the file." },
+  "schema:distribution/schema:contentUrl": { "label": "Web address of the file", "help": "The address the file is downloaded from." },
+  "schema:distribution/schema:encodingFormat": {
+    "label": "File format",
+    "help": "For example: text/csv, application/zip. Press Enter after each one."
+  },
+  "schema:distribution/schema:contentSize": { "label": "Size", "help": "For example: 24 MB." },
+  "schema:distribution/schema:description": { "label": "Description", "help": "What the file holds." },
   "schema:relatedLink": {
     "label": "Related links",
     "help": "Papers, documentation, software or other datasets connected to this one."

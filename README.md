@@ -167,7 +167,8 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `src/corrections.js` | Corrections laid over the copied form files when the form loads: one for each known defect in them, and two choices made here (no "kind of resource" field; language starts as English). |
 | `src/Completeness.jsx` | The count of fields filled in, overall and tab by tab, shown above the form. |
 | `src/theme.js` | The form's sizes: 14px text in 36px boxes, following the compact profile the CEDAR Embeddable Editor documents. |
-| `src/Section.jsx` | A group of fields with a heading that folds it shut and opens it again. |
+| `src/Section.jsx` | A group of fields with a heading that folds it shut and opens it again, and the button that closes or opens them all. |
+| `src/RowList.jsx` | A list of groups (grants, licences, variables, downloads) as compact rows, with each entry's less-used fields behind a "More" button. |
 | `src/lists.jsx` | Compact controls for fields that take several values, each value a small tag: any list of text, "Specific information type" with its examples, and keywords as text or a term from a vocabulary. |
 | `src/Language.jsx` | The language field: a box that offers ten common languages and still takes any text. |
 | `src/Drafts.jsx` | The signed-in person's list of their own records, each with a button to open it. |
