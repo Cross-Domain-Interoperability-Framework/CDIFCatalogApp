@@ -117,6 +117,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `design.md` | The design: why replace the Java applications, the architecture, how records are stored, user groups, outbound formats, and the prototype's build plan with its pass and fail criteria. |
 | `user-guide.md` | A guide for someone new to the catalog: what it is for, how CDIF profiles stack, and how to read records, fill in the form and harvest. |
 | `form-inventory.md` | What is wrong with the stock generated form, found by using it, and the five issues raised with metadataBuildingBlocks. |
+| `scientist-sessions.md` | How to run the three scientist sessions that end the prototype: what to prepare, the task sheet, what counts as help, the observation sheet and the result page. |
 | `setup-sandboxes.md` | How to register an ORCID sandbox client, and when a DataCite test account is needed. |
 | `deploy-render.md` | How to put the catalog on Render, what its free plans mean, and what has not been checked. |
 
