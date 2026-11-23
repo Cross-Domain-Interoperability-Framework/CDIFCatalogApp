@@ -126,6 +126,18 @@ def iso(content: str) -> dict:
     return _record(module.convert_iso_to_cdif(records[0], detect=False))
 
 
+def datacite(content: str) -> dict:
+    """DataCite XML, kernel 3 or 4: one record on its own."""
+    from lxml import etree
+
+    module = _script("DataCite/datacite_to_cdif.py")
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False)
+    records = module.resources(etree.fromstring(content.encode("utf-8"), parser))
+    if len(records) != 1:
+        raise HarvestError(f"The file holds {len(records)} DataCite records; one record per file is expected.")
+    return _record(module.convert_datacite_to_cdif(records[0], detect=False))
+
+
 def schemaorg(content: str) -> dict:
     return _record(_script("soso/ConvertFromSOSO.py").convert_soso_to_cdif(json.loads(content), profile="discovery"))
 
@@ -180,6 +192,7 @@ CONNECTED = {
     "iso19115-2": iso,
     "iso19115-3": iso,
     "csw-response": iso,
+    "datacite-xml": datacite,
     "schemaorg-jsonld": schemaorg,
     "croissant": croissant,
     "fair2": fair2,
