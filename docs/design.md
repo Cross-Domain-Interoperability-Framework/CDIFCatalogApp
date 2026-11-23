@@ -285,7 +285,7 @@ As of 23 November 2026. The work did not follow the order above: the spike was b
 
 | Step | Stands at | Built | Not built |
 |---|---|---|---|
-| 1. Spike | Days 1 to 8 built, with two gaps. Days 9 and 10 not started, so the spike's question is unanswered. | See the day-by-day table. | The dry run, the scientist sessions, and the go or no-go. |
+| 1. Spike | Days 1 to 8 built, with two gaps. Day 10 not started, so the spike's question is unanswered. | See the day-by-day table. | The scientist sessions, and the go or no-go. |
 | 2. Pipeline and store | Partly built. | The `records` and harvest tables; a worker; web folder harvesting; recognising a format from content; 14 formats connected to converters; conformance worked out from content; validation, with invalid records stored but not served. | The other connectors (sitemap, CSW, OAI-PMH, CKAN, STAC, DCAT, file upload). The 121 ADA records have not been reproduced. Re-converting stored records after a converter is corrected. |
 | 3. Search and record pages | A small part. | A record address that answers by `Accept` header or `format` parameter, with a plain summary page. | Search of any kind, the search row, the search page, the designed record page, the sitemap, OGC API Records. |
 | 4. ISO output and CSW | Not started. | | All of it. |
@@ -296,7 +296,7 @@ As of 23 November 2026. The work did not follow the order above: the spike was b
 
 Not in the order of work, and built: looking for profiles by groups listed in `server/app/profile-sources.yaml`, with DDE and geochemistry groups that can be switched on; a user guide (`docs/user-guide.md`).
 
-One thing stands between here and the scientist sessions: the dry run of day 9. Drafts are tied to the signed-in user, and the prototype runs at a web address with HTTPS (`docs/deploy-render.md`).
+Nothing built stands between here and the scientist sessions: drafts are tied to the signed-in user, the prototype runs at a web address with HTTPS (`docs/deploy-render.md`), and the dry run of day 9 is done. The dry run was by script, so a pass through the form by a person who knows it is still worth making first; its findings are in `docs/form-inventory.md`.
 
 ## To do: practices taken from CKAN
 
@@ -374,7 +374,7 @@ Where each day stands on 23 November 2026:
 | 6 | Done. |
 | 7 | Done. |
 | 8 | Report done. The completeness indicator is not built. |
-| 9 | Not started. |
+| 9 | Done on 23 November 2026, by script and not by hand: all five example records submit valid. What could not be entered, and what a person would trip on, is in `docs/form-inventory.md`. |
 | 10 | Not started. |
 
 ### Early stop

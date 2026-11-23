@@ -104,6 +104,50 @@ controls do not address. That is not the case:
 - Section C is layout and wording work, not controls. It is larger than the plan allowed for,
   mainly the distribution section.
 
+## Dry run, 23 November 2026
+
+Day 9 of the build plan: re-enter five existing example records and fix what breaks. The five
+were the profile's own examples: `exampleCDIFDiscoveryMinimal`, `exampleCDIFDiscovery`,
+`exampleCDIFDiscoveryComplete`, `exampleCdifCore` and `exampleCdifCoreComplete`.
+
+**How it was done, and what that leaves unproven.** Not by a person's hands. The first record was
+entered in a browser by automation, which could not type into the date field or reliably into a
+list entry, so its date and variable names were set through the saving address; it was then
+checked and submitted with the form's own buttons. All five were then run by a script that
+reshapes each example into the form's document, keeps only what the form has a field for, drops
+the type markers the form cannot hold, saves it as a draft and submits it. That proves the
+records the form can produce are accepted. It does not prove a person can find and fill the
+fields; that is what day 10 is for.
+
+**Result: all five submit valid.** Two faults found by filling in the form on the deployed
+prototype the same day were fixed first (spaces around a pasted address; type markers the form
+cannot hold), and without the second of those the records with variables did not submit.
+
+### What could not be entered
+
+| What | Where it shows | What to do |
+|---|---|---|
+| A related link's name and address | The layout addresses them as `target`, where the schema's property is `schema:target`. A link's kind could be entered, not what it links to. | Corrected the same day in `web/src/corrections.js`, which lays the right address over the layout when the form loads. A defect in the layout file; item 7 below |
+| A variable's concept, unit code, range and method | The variable has three fields: name, unit, description. The report then recommends a concept link the form has no field for. | Add the fields, or stop recommending what cannot be entered |
+| A place given as a point or a shape | Only a name and a bounding box can be entered | In the plan as the map control, after the spike |
+| A person's or organisation's contact details, description and further identifiers | The pickers hold name, identifier and affiliation | Acceptable for the spike |
+| A funder's identifier; the source catalog's address | No field | Acceptable for the spike |
+| An entry given only as a reference to something described elsewhere (a contributor in one example, a provider in two) | The form has no way to point at a description held elsewhere; a person would type the name | By design |
+
+### What a person would trip on
+
+Seen in the browser on the first record:
+
+- **A download is still the stock rendering**: some twenty fields labelled "Schema Content Url",
+  "Spdx Algorithm *" and the like (section C). It is the largest piece of jargon left in the form.
+- **A new variable's description arrived filled with the word "missing"** (item 3 below, not yet
+  corrected in the form files), and was saved and submitted as the description. Corrected the
+  same day in `web/src/corrections.js`, which takes that default out when the form loads.
+- **The form shows its own count of faults** as a red badge beside a list (5 beside three
+  variables) while the server reports nothing to fix.
+- **"Kind of resource" shows `schema:Dataset`** as its value.
+- The landing page is marked "is a required property" on a blank form (section A).
+
 ## Found for metadataBuildingBlocks
 
 These are defects or questions in the source of the form files, not in this application:
@@ -120,3 +164,14 @@ All five were filed there on 17 November 2026: [#106](https://github.com/Cross-D
    schema requires a list. A record straight from the form therefore fails the profile schema at
    every such node. The server converts it on the way in; the form files should agree with the
    schema instead.
+6. Found on 23 November 2026: where the profile holds `@type` as a list (a measured variable, an
+   activity, a funding identifier, a checksum, a source catalog's identifier), the generated form
+   schema gives it no default and the layout has no field for it, so the record fails with a
+   fault the author cannot fix. The server adds the marker on the way in. Filed as
+   [#113](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/113).
+7. Found in the dry run, 23 November 2026, and filed as
+   [#114](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/114):
+   in `uischema.json` the two controls
+   under a related link are scoped `#/properties/target/properties/schema:name` and
+   `.../schema:url`. The schema's property is `schema:target`, so what a link points to cannot
+   be entered.

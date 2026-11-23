@@ -16,7 +16,8 @@ An early prototype. Built: the `CoreDiscovery` submission form (draft saving, OR
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
 web folders with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
-the signed-in user. Not built: the dry run and scientist sessions (plan days 9 and 10),
+the signed-in user. The dry run (plan day 9) was done by script; its findings are in
+`docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
 other harvesters, mappings into CDIF, publishing of submitted records, search, CSW, OGC API
 Records and the sitemap. Do not start those without being asked.
 
@@ -89,7 +90,9 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   `web/public/forms/CoreDiscovery/*`, `server/app/profiles/{CoreDiscovery,cdifCore}/*` and
   `server/tests/fixtures/{CoreDiscovery,cdifCore}/*`. From SEMIC: `server/tests/fixtures/shapes/*`. Each has a `PINNED.md` naming the commit and the refresh
   steps. Refresh the form files and the validation files together, or the form and the validator
-  disagree. A defect in them is an issue for metadataBuildingBlocks, not a local patch.
+  disagree. A defect in them is an issue for metadataBuildingBlocks, not a local patch. Where a
+  defect in the form files stops a person entering something, a correction is laid over them
+  when the form loads (`web/src/corrections.js`); delete each one when a refresh brings the fix.
 - **Do not write a conformance address or its version in code.** `validate.load` reads them from
   the pinned schema (or, for a single level such as `cdifCore`, the `conformance.json` beside
   it), and a test fails if `/2.0` appears in `validate.py`. They moved from 1.1 to 2.0 once already.

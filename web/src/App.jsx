@@ -3,6 +3,7 @@ import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
 import Account from './Account.jsx';
+import { correctLayout, correctSchema } from './corrections.js';
 import DoiPrefill from './DoiPrefill.jsx';
 import Drafts from './Drafts.jsx';
 import { fitRecord } from './fit.js';
@@ -98,9 +99,11 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [schema, uischema, defaults] = await Promise.all(
+      const [rawSchema, rawLayout, defaults] = await Promise.all(
         ['schema', 'uischema', 'defaults'].map(loadJson),
       );
+      const schema = correctSchema(rawSchema);
+      const uischema = correctLayout(rawLayout);
       let document = defaults;
       let state = { kind: 'new' };
       const id = storedDraftId();
