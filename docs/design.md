@@ -1,6 +1,6 @@
 # CDIF Catalog Design
 
-Proposal to replace the GeoNetwork and Geoportal deployments · 16 November 2026 · Draft for discussion
+Proposal to replace the GeoNetwork and Geoportal deployments · 16 November 2026 · Draft for discussion · What is built was last reviewed on 23 November 2026; see [Where the build stands](#where-the-build-stands)
 
 Replace both Java catalogs with a small Python application in which the CDIF JSON-LD record is the stored record. Harvesting, mapping and validation reuse tooling that already exists; the new work is a store, a search API, and an editor.
 
@@ -31,6 +31,8 @@ The requirement is small. The platform carrying it is large and its canonical mo
 | API                     | FastAPI, following the stac-fastapi and pgstac pattern. OGC API Records for search and harvest, a sitemap, and a DCAT catalog feed. CSW through a read-only pycsw front end. | New.                                                                                                                                  |
 | Search and record pages | A static search page. Record pages embed their JSON-LD and are listed in a sitemap.                                                                                          | The Flask record viewer.                                                                                                              |
 | Editor                  | JSON Forms with React and Material renderers.                                                                                                                                | Generated form schemas; hand-written layouts for `CoreDiscovery` and `xasDocument`.                                                   |
+
+**The mapping layer was built differently from the table.** No XSLT is run. Every connected format, XML included, is converted by a Python script from the CDIF `converters` repository (see [How harvests are stored](#how-harvests-are-stored)); the ISO converter reads the XML with `lxml`. `saxonche` is not installed. The XSLT route remains the plan for ISO output, which is not built.
 
 PostgreSQL is sufficient for tens of thousands to a million records. Move search to OpenSearch only if facet counts or relevance ranking become a bottleneck, because it adds a second service to run and keep in sync.
 
@@ -80,7 +82,7 @@ Records are stored in PostgreSQL as JSON documents (the `jsonb` column type). Ea
 - **Search does not read the JSON directly.** A flat search row is derived from each published record on save: title, description, keywords, a geometry for the bounding box, date ranges and a full-text index. The JSON is the record; the search row is an index that can be rebuilt from it at any time.
 - **ISO and DCAT output** are stored the same way: derived from the published record on publish, never edited.
 
-Built so far: the drafts table, and the `records` table with the layout above. Harvested records fill it; publishing a submitted draft into it is not built.
+Built so far: the drafts table, and the `records` table with the layout above. Harvested records fill it; publishing a submitted draft into it is not built. The overlay column is always empty, the status "conflict" is never set, and no search row or ISO output is derived. A draft has no owner: anyone holding its id can read and change it, signed in or not.
 
 > **Decided:** a submitted draft is not published. It stays out of the catalog feed and has no record address until the review step exists and a curator approves it.
 
@@ -96,24 +98,25 @@ The model is the one ckanext-harvest uses, reimplemented.
 | `harvest_errors` | One failure | The run, the record if there was one, the stage (gather, fetch, import or job) and the message. |
 
 - **Three stages.** Gather (list what the source holds), fetch (get one record as sent) and import. Each kind of source provides the first two. Import is shared: recognise the format from the content, convert it to CDIF, validate, store.
-- **Format is recognised from content.** File names and media types are not trusted. A CDIF JSON-LD record is recognised by the conformance addresses in its catalog record (`schema:subjectOf`, `dcterms:conformsTo`), and those addresses choose the profile it is validated against. Also recognised: schema.org, DCAT, Croissant, FAIR2, RO-Crate and DDI-CDI JSON-LD; UMM, STAC, DataCite, CKAN, DCAT-US and NIAID JSON; ISO 19139, 19115-2 and 19115-3, CSW responses, FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI 1.2.2, DDI Codebook 2.5, DDI Lifecycle, DDI-CDI, SDMX-ML, OGC capabilities and DCAT RDF/XML; DCAT and schema.org Turtle.
+- **Format is recognised from content.** File names and media types are not trusted. A CDIF JSON-LD record is recognised by the conformance addresses in its catalog record (`schema:subjectOf`, `dcterms:conformsTo`), and those addresses choose the profile it is validated against. An RO-Crate is asked for first, because a crate made from a CDIF record keeps that record's conformance addresses. Also recognised: schema.org, DCAT, Croissant, FAIR2, RO-Crate and DDI-CDI JSON-LD; UMM, STAC, DataCite, CKAN, DCAT-US and NIAID JSON; ISO 19139, 19115-2 and 19115-3, CSW responses, FGDC, ArcGIS, EML, DataCite, Dublin Core, DDI 1.2.2, DDI Codebook 2.5, DDI Lifecycle, DDI-CDI, SDMX-ML, OGC capabilities and DCAT RDF/XML; DCAT and schema.org Turtle.
 - **Recognising is not converting.** A record in a format with no connected converter is stored as received, and the run reports the format and any converter that exists for it. Once a converter is connected, a retry of the failed records converts them.
-- **Converters come from the CDIF `converters` repository**, a git submodule pinned to a commit. A converted record is given a conformance declaration by the catalog, worked out from its content by `detect_conformance.py` (in the converters' own `validation` submodule), then checked; it is published only if it passes. The table below is what each connected converter did on its own example files on 19 November 2026.
+- **Converters come from the CDIF `converters` repository**, a git submodule pinned to a commit. A converted record is given a conformance declaration by the catalog, worked out from its content by `detect_conformance.py` (in the converters' own `validation` submodule), then checked; it is published only if it passes. The table below is what each connected converter did on up to three of its own example files on 23 November 2026, with the converters at `8c02b14`, each record checked against the profile it reaches (core or discovery).
 
-| Format | Converter | On its examples, against the pinned `CoreDiscovery` profile |
+| Format | Converter | On its examples, against the pinned profile the record reaches |
 |---|---|---|
-| ISO 19139, ISO 19115-2, ISO 19115-3, and a CSW response holding one record | `ISO19115/iso_to_cdif.py` | Valid (3 of 3 each). |
-| DDI-CDI XML | `DDI-CDI/ddicdi_to_cdif.py` | Valid (2 of 2). |
-| schema.org JSON-LD | `soso/ConvertFromSOSO.py` | Converts; not valid (3 of 3). For example a funder given as text, and a citation address that is not a web address. |
-| Croissant | `croissant/ConvertFromCroissant.py` | Converts; not valid (3 of 3): `@type` written as one word where the profile wants a list. |
-| RO-Crate | `ROCrate/ROCrateToCDIF.py` | Converts; not valid (3 of 3): file size written as a number where the profile wants text. |
-| NASA UMM-C | `UMM/umm_to_cdif.py` | Converts; not valid (3 of 3): distributions with no download address. |
+| ISO 19139, ISO 19115-2, ISO 19115-3, and a CSW response holding one record | `ISO19115/iso_to_cdif.py` | Valid (3 of 3 each; no example of a CSW response was among the files tried). |
+| DDI-CDI XML | `DDI-CDI/ddicdi_to_cdif.py` | Valid (2 of 2): one reaches discovery, one core only. |
+| schema.org JSON-LD | `soso/ConvertFromSOSO.py` | Converts; not valid (3 of 3): downloads with no address, a citation address that is not a web address, and a place with no type. One other example, not among the three, was harvested and published. |
+| Croissant | `croissant/ConvertFromCroissant.py` | Converts; not valid (3 of 3): a creator's `@type` written as one word where the profile wants a list. |
+| RO-Crate | `ROCrate/ROCrateToCDIF.py` | Valid (1 of 3). The other two: file size written as a number where the profile wants text, a licence address that is not a web address, and no identifier. The XAS example crate, not among the three, is valid since the converter's list handling was corrected (converters pull request 48). |
+| NASA UMM-C | `UMM/umm_to_cdif.py` | Converts; not valid (3 of 3): distributions with neither a download address nor parts. The rule messages for these have no plain wording yet. |
 | DDI-CDI JSON-LD | `DDI-CDI/ddicdi_jsonld_to_cdif.py` | Converts; not valid (3 of 3): a distribution name that is not text. |
-| FAIR2 | `FAIR2/fair2_to_cdif.py` | Converts; not valid (1 of 1): checksums with no algorithm. Took over a minute. |
-| DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Valid (6 of 6): one nested record each, asked for with `framed=True`. Converting takes about a second; checking a large record (hundreds of variables and code lists) takes 20 to 80 seconds. |
+| FAIR2 | `FAIR2/fair2_to_cdif.py` | Converts; not valid (1 of 1): alternate names of variables not written as a list, checksums with no algorithm, a funder given as text. Took 91 seconds. |
+| DDI 1.2.2, DDI Codebook 2.5 | `DDI/ddi_sssom_to_cdif.py` | Valid (6 of 6): one nested record each, asked for with `framed=True`. Converting takes about a second; checking a large record (hundreds of variables and code lists) takes from 20 seconds to several minutes. The six took 8 minutes in all. |
 | DCAT (JSON-LD, RDF/XML, Turtle), SDMX-ML | exist | Not connected: each takes one dataset or dataflow picked out of a larger document. |
 | DataCite XML (kernel 3 and 4), one record per file | `DataCite/datacite_to_cdif.py` | Valid (50 of 50) against the profile each reaches: 12 reach discovery, 38 core only. A record inside an OAI-PMH response is not connected. |
-| FGDC, ArcGIS, EML, DataCite JSON, Dublin Core, DDI Lifecycle, OGC capabilities, STAC, CKAN, DCAT-US, NIAID | none connected | Recognised and kept as received. NIAID has a harvester script, not a converter function. |
+| EML, FGDC, Dublin Core, OGC service capabilities, STAC | exist since the converters moved to `8c02b14` | Not connected, and not tried here. The detector still reports them as having no converter. |
+| ArcGIS, DataCite JSON, DDI Lifecycle, CKAN, DCAT-US, NIAID | none connected | Recognised and kept as received. NIAID has a harvester script, not a converter function. |
 
 The "not valid" rows are for the `converters` and `metadataBuildingBlocks` repositories to settle: either the converter's output or the profile the catalog pins is behind the other. They are not patched here.
 - **`robots.txt` is obeyed**, including its crawl delay, unless a source's settings say to ignore it. A closed subfolder or file is skipped; a closed starting point fails the run.
@@ -122,7 +125,9 @@ The "not valid" rows are for the `converters` and `metadataBuildingBlocks` repos
 - **Deletion needs a complete listing and a trouble-free run.** A record missing from a full listing is withdrawn, at the end of the run and only if every listed record could be fetched. A "changed since" listing says nothing about what it leaves out, and a source that is failing requests cannot be trusted about what it lists.
 - **Invalid records are stored, not published.** The text as received is kept, the problem is an error row, and the record is not served.
 - **The queue is the job table.** A worker claims a waiting job with a row lock that other workers skip. There is no message broker.
-- **Not built:** email to an organisation's admins when a run fails, because there are no users to send it to until sign-in exists.
+- **A corrected converter does not reach records already harvested.** A file whose content has not changed is skipped, so a record converted wrongly stays as it was. A retry run converts again the records that failed, which is how a record that was invalid under the old converter gets through (done by hand for one record on 23 November 2026). A record that passed but was converted poorly is not looked at again. Converting every affected record again from its stored text, the reason that text is kept, is not built.
+- **Not built:** email to an organisation's admins when a run fails. Users can now sign in, but ORCID sign-in gives the catalog a name and an iD, not an email address, and no user belongs to an organisation yet.
+- **Not built:** any page for harvesting. Sources are registered and runs started through the API, by a signed-in admin.
 
 > **Decided:** if a source changes a published record into an invalid one, the record stops being served until it is fixed. The earlier valid version is not kept on show.
 
@@ -274,6 +279,25 @@ The form schema for each profile is already generated from the building blocks. 
 7.  **DDE editor layout and the remaining custom controls.**
 8.  **Retire GeoNetwork.** Until then it stays up and is harvested over CSW.
 
+### Where the build stands
+
+As of 23 November 2026. The work did not follow the order above: the spike was built as far as day 8, then parts of steps 2, 3, 5 and 6 were built ahead of the scientist sessions. Everything below runs only on a developer's machine.
+
+| Step | Stands at | Built | Not built |
+|---|---|---|---|
+| 1. Spike | Days 1 to 8 built, with two gaps. Days 9 and 10 not started, so the spike's question is unanswered. | See the day-by-day table. | The dry run, the scientist sessions, and the go or no-go. |
+| 2. Pipeline and store | Partly built. | The `records` and harvest tables; a worker; web folder harvesting; recognising a format from content; 14 formats connected to converters; conformance worked out from content; validation, with invalid records stored but not served. | The other connectors (sitemap, CSW, OAI-PMH, CKAN, STAC, DCAT, file upload). The 121 ADA records have not been reproduced. Re-converting stored records after a converter is corrected. |
+| 3. Search and record pages | A small part. | A record address that answers by `Accept` header or `format` parameter, with a plain summary page. | Search of any kind, the search row, the search page, the designed record page, the sitemap, OGC API Records. |
+| 4. ISO output and CSW | Not started. | | All of it. |
+| 5. DCAT mapping and feed | Built as a first version. | The CDIF-to-DCAT mapping table; the feed in Turtle, JSON-LD and RDF/XML with paging and `modified_since`; output tested against the SEMIC shapes. | A run by a real DCAT harvester. Submitted records in the feed. |
+| 6. Harvest registration, overlays, conflicts | A small part. | Registering a source and starting, retrying and reading a run through the API, for admins only; sign-in with ORCID; labels on records and users. | Any harvest page; a test harvest that publishes nothing; file upload and API tokens; overlay editing; conflict handling; the submitter, data manager and curator groups; organisations for users. |
+| 7. DDE layout and controls | Wording only. | Plain-language labels, help and rule messages for `CoreDiscovery`. | The DDE layout, the vocabulary picker, the map control, the geologic age fields. |
+| 8. Retire GeoNetwork | Not started. | | |
+
+Not in the order of work, and built: looking for profiles by groups listed in `server/app/profile-sources.yaml`, with DDE and geochemistry groups that can be switched on; a user guide (`docs/user-guide.md`).
+
+Three things stand between here and the scientist sessions: drafts tied to the signed-in user, the dry run of day 9, and a web address with HTTPS.
+
 ## To do: practices taken from CKAN
 
 CKAN is not the base for this catalog (see Alternatives considered), but a review of `ckan`, `ckanext-dcat`, `ckanext-spatial`, `ckanext-harvest` and `ckanext-scheming` on 18 and 19 November 2026 found practices worth adopting. All but `ckanext-scheming` are AGPL, so each item below is reimplemented here, not copied.
@@ -339,21 +363,35 @@ This spike answers one question: can a domain scientist submit a valid `CoreDisc
 | 9   | Dry run: re-enter five existing example records by hand. Fix what breaks.                                                                                                  | All five submit valid.                                                                                  |
 | 10  | Three scientist sessions of 30 minutes, thinking aloud. Write up.                                                                                                          | A one-page result against the pass and fail table.                                                      |
 
+Where each day stands on 23 November 2026:
+
+| Day | Stands at |
+|---|---|
+| 1 | Done. |
+| 2 | Done: `docs/form-inventory.md`. |
+| 3 | Built, but the "done when" is not met as written. Drafts save and reload, and ORCID sign-in works, yet a draft is not tied to the signed-in user: the browser remembers its id. There is no table of saved versions. |
+| 4–5 | Done. |
+| 6 | Done. |
+| 7 | Done. |
+| 8 | Report done. The completeness indicator is not built. |
+| 9 | Not started. |
+| 10 | Not started. |
+
 ### Early stop
 
 If the day 2 inventory shows the stock form is unusable in ways the planned custom controls do not address, or the person and organisation picker is not working by the end of day 5, stop and decide on the hand-built form then. Do not wait for day 10.
 
 ### Needed before day 1
 
-- An ORCID sandbox API client registered, for sign-in and author search.
-- Three scientists booked for day 10, none of whom has seen CDIF.
-- A web address with HTTPS for the test sessions, which ORCID sign-in requires outside a developer's own machine.
+- Done: an ORCID sandbox API client registered, for sign-in and author search. Sign-in worked against the sandbox on 19 November 2026.
+- Three scientists booked for day 10, none of whom has seen CDIF. Not recorded as done.
+- Not done: a web address with HTTPS for the test sessions, which ORCID sign-in requires outside a developer's own machine. The catalog runs only on a developer's machine, with development servers; nothing to deploy it elsewhere exists.
 - Done: this repository, public, in the Cross-Domain-Interoperability-Framework organisation.
 
 ### Known traps
 
 - **The form schema drops `contains` constraints.** The form passing proves nothing; only the day 7 endpoint decides validity.
-- **Conformance addresses are moving from version 1.1 to 2.0.** Read them from the schema; do not write them into the spike's code.
+- **Conformance addresses are moving from version 1.1 to 2.0.** Read them from the schema; do not write them into the spike's code. (They have since moved; the pinned files and the converters declare 2.0, and a test fails if the version is written into `validate.py`.)
 - **`defaults.json` is the only source of a new record's conformance declaration and nothing checks it.** The server stamps the declaration instead of trusting it.
 - **The `schema` prefix must be `http://schema.org/`.** A lookup that writes the `https` form produces a record that validates as empty.
 
@@ -366,7 +404,7 @@ If the day 2 inventory shows the stock form is unusable in ways the planned cust
 
 ## Open questions
 
-- Which identity provider: ORCID alone, or ORCID plus an institutional login for staff?
+- Which identity provider: ORCID alone, or ORCID plus an institutional login for staff? ORCID sign-in is built; the institutional login is still undecided.
 - Where do the SKOS vocabularies live once GeoNetwork is retired?
 
 ## Basis and limits
