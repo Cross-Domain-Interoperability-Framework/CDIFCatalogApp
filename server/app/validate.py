@@ -198,6 +198,20 @@ def prepare(profile: str, document: dict, record_id: str | None = None) -> dict:
                 for c in groups
             ]
 
+    # The form holds a contributor as one person or organisation with a role beside the name.
+    # A record holds it as the role, with the person or organisation inside it.
+    contributors = record.get("schema:contributor")
+    if isinstance(contributors, list):
+        record["schema:contributor"] = [
+            {
+                "@type": ["schema:Role"],
+                "schema:roleName": c["schema:roleName"],
+                "schema:contributor": {k: v for k, v in c.items() if k != "schema:roleName"},
+            }
+            if isinstance(c, dict) and c.get("schema:roleName") and "schema:contributor" not in c else c
+            for c in contributors
+        ]
+
     spec = load(level_for(profile, record))
     _add_type_markers(record, spec["schema"], spec["schema"])
     record["@context"] = {**context, **spec["prefixes"]}

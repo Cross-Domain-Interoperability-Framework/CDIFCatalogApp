@@ -1,6 +1,6 @@
 // Custom JSON Forms controls for people and organisations. Each is registered against the part of
 // the CoreDiscovery form it replaces; everything else keeps the stock Material renderer.
-import { Actions, rankWith, scopeEndsWith } from '@jsonforms/core';
+import { Actions, and, rankWith, schemaMatches, scopeEndsWith, uiTypeIs } from '@jsonforms/core';
 import { useJsonForms, withJsonFormsControlProps } from '@jsonforms/react';
 import {
   Box,
@@ -19,6 +19,7 @@ import ArrowDownward from '@mui/icons-material/ArrowDownward';
 import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import { useState } from 'react';
+import { InformationType, Keywords, TextList } from './lists.jsx';
 import Language from './Language.jsx';
 import { OrganisationField, RegistrySearch } from './lookup.jsx';
 
@@ -124,6 +125,9 @@ function PartyRow({ entry, index, count, ordered, withRole, onChange, onMove, on
               label="Role"
               size="small"
               fullWidth
+              required
+              error={!entry['schema:roleName']}
+              helperText="What they did. For example: editor, data collector, laboratory analyst."
               value={entry['schema:roleName'] || ''}
               onChange={(e) => set('schema:roleName', e.target.value)}
             />
@@ -237,6 +241,27 @@ function organisationName(withIdentifier) {
 
 const PartyListControl = withJsonFormsControlProps(PartyList);
 
+// The kind of identifier a number is ("award number"). The schema takes it as text or as a
+// reference to a registry by its address, and the stock control shows that choice as two tabs
+// with made-up names. One text box does for both: text is saved as text, and an address typed
+// here is still text the schema accepts. A reference already in a copied record shows as its
+// address.
+function IdentifierKind({ data, handleChange, path, label, description, enabled, visible }) {
+  if (visible === false) return null;
+  const text = typeof data === 'string' ? data : data?.['@id'] || '';
+  return (
+    <TextField
+      label={label}
+      helperText={description}
+      fullWidth
+      disabled={enabled === false}
+      value={text}
+      onChange={(e) => handleChange(path, e.target.value || undefined)}
+      sx={{ my: 1 }}
+    />
+  );
+}
+
 export const customRenderers = [
   { tester: rankWith(10, scopeEndsWith('schema:creator/properties/@list')), renderer: PartyListControl },
   { tester: rankWith(10, scopeEndsWith('#/properties/schema:contributor')), renderer: PartyListControl },
@@ -249,4 +274,18 @@ export const customRenderers = [
     renderer: withJsonFormsControlProps(organisationName(false)),
   },
   { tester: rankWith(10, scopeEndsWith('#/properties/schema:inLanguage')), renderer: withJsonFormsControlProps(Language) },
+  {
+    tester: rankWith(10, scopeEndsWith('#/properties/schema:additionalType')),
+    renderer: withJsonFormsControlProps(InformationType),
+  },
+  { tester: rankWith(10, scopeEndsWith('#/properties/schema:keywords')), renderer: withJsonFormsControlProps(Keywords) },
+  {
+    tester: rankWith(10, and(scopeEndsWith('#/properties/schema:propertyID'), schemaMatches((s) => !!s.anyOf?.some((b) => b.type === 'string')))),
+    renderer: withJsonFormsControlProps(IdentifierKind),
+  },
+  // Every other list of plain text, wherever it is in the form.
+  {
+    tester: rankWith(9, and(uiTypeIs('Control'), schemaMatches((s) => s.type === 'array' && s.items?.type === 'string'))),
+    renderer: withJsonFormsControlProps(TextList),
+  },
 ];

@@ -28,12 +28,12 @@
     "help": "The language of the data. Choose one from the list, or type another."
   },
   "schema:additionalType": {
-    "label": "More specific kinds",
-    "help": "Optional. More precise terms for what this is, such as observational data or model output."
+    "label": "Specific information type",
+    "help": "Provide a more specific category of information, research topic, or analytical technique. The list gives some examples; you can type your own, and add more than one."
   },
   "schema:keywords": {
     "label": "Keywords",
-    "help": "Words or short phrases people might search for. Add each one separately."
+    "help": "Words or short phrases people might search for. Press Enter after each one."
   },
   "schema:sameAs": {
     "label": "Other identifiers",
@@ -94,7 +94,7 @@
   },
   "schema:funding/schema:identifier/schema:propertyID": {
     "label": "Kind of number",
-    "help": "For example: award number."
+    "help": "What sort of number this is. For example: award number."
   },
   "schema:funding/schema:identifier/schema:value": { "label": "Number" },
   "schema:funding/schema:identifier/schema:url": {
