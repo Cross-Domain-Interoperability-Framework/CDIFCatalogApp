@@ -46,62 +46,87 @@ function fromRegistry(type, option) {
   });
 }
 
+// One author or contributor on one line: name, kind, and for a contributor the role. The
+// identifier and affiliation sit behind "More", closed until asked for, as in the ADA metadata
+// form. The button counts what is filled in there, so a picked ORCID iD is not forgotten.
 function PartyRow({ entry, index, count, ordered, withRole, onChange, onMove, onRemove, idBase }) {
+  const [more, setMore] = useState(false);
   const set = (key, value) => onChange(clean({ ...entry, [key]: value }));
   const identifier = entry['schema:identifier'] || '';
   const isOrg = entry['@type'] === ORGANISATION;
+  const affiliation = entry['schema:affiliation']?.['schema:name'];
+  const hidden = [identifier, !isOrg && affiliation].filter(Boolean).length;
   return (
-    <Paper variant="outlined" sx={{ p: 1.5 }}>
-      <Stack spacing={1.5}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
-          {ordered && (
-            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 20 }}>
-              {index + 1}.
-            </Typography>
-          )}
+    <Paper variant="outlined" sx={{ px: 1, py: 0.5 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
+        {ordered && (
+          <Typography variant="body2" color="text.secondary" sx={{ minWidth: 20, pt: 1.75 }}>
+            {index + 1}.
+          </Typography>
+        )}
+        <TextField
+          id={`${idBase}-name`}
+          label={isOrg ? 'Organisation name' : 'Name'}
+          fullWidth
+          required
+          value={entry['schema:name'] || ''}
+          error={!entry['schema:name']}
+          onChange={(e) => set('schema:name', e.target.value)}
+        />
+        <TextField
+          id={`${idBase}-type`}
+          label="Type"
+          select
+          sx={{ minWidth: 140 }}
+          value={entry['@type'] || PERSON}
+          onChange={(e) => set('@type', e.target.value)}
+        >
+          <MenuItem value={PERSON}>Person</MenuItem>
+          <MenuItem value={ORGANISATION}>Organisation</MenuItem>
+        </TextField>
+        {withRole && (
           <TextField
-            id={`${idBase}-name`}
-            label={isOrg ? 'Organisation name' : 'Name'}
-            size="small"
+            id={`${idBase}-role`}
+            label="Role"
             fullWidth
             required
-            value={entry['schema:name'] || ''}
-            error={!entry['schema:name']}
-            onChange={(e) => set('schema:name', e.target.value)}
+            error={!entry['schema:roleName']}
+            placeholder="For example: editor"
+            value={entry['schema:roleName'] || ''}
+            onChange={(e) => set('schema:roleName', e.target.value)}
           />
-          <TextField
-            id={`${idBase}-type`}
-            label="Type"
-            size="small"
-            select
-            sx={{ minWidth: 150 }}
-            value={entry['@type'] || PERSON}
-            onChange={(e) => set('@type', e.target.value)}
+        )}
+        <Box sx={{ whiteSpace: 'nowrap', pt: 1 }}>
+          <Button
+            id={`${idBase}-more`}
+            variant="outlined"
+            color="inherit"
+            aria-expanded={more}
+            onClick={() => setMore(!more)}
+            sx={{ mr: 0.5 }}
           >
-            <MenuItem value={PERSON}>Person</MenuItem>
-            <MenuItem value={ORGANISATION}>Organisation</MenuItem>
-          </TextField>
-          <Box sx={{ whiteSpace: 'nowrap' }}>
-            {ordered && (
-              <>
-                <IconButton aria-label={`Move ${index + 1} up`} size="small" disabled={index === 0} onClick={() => onMove(-1)}>
-                  <ArrowUpward fontSize="small" />
-                </IconButton>
-                <IconButton aria-label={`Move ${index + 1} down`} size="small" disabled={index === count - 1} onClick={() => onMove(1)}>
-                  <ArrowDownward fontSize="small" />
-                </IconButton>
-              </>
-            )}
-            <IconButton aria-label={`Remove ${entry['schema:name'] || `entry ${index + 1}`}`} size="small" onClick={onRemove}>
-              <DeleteOutline fontSize="small" />
-            </IconButton>
-          </Box>
-        </Stack>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+            {more ? 'Less' : hidden ? `More (${hidden})` : 'More'}
+          </Button>
+          {ordered && (
+            <>
+              <IconButton aria-label={`Move ${index + 1} up`} size="small" disabled={index === 0} onClick={() => onMove(-1)}>
+                <ArrowUpward fontSize="small" />
+              </IconButton>
+              <IconButton aria-label={`Move ${index + 1} down`} size="small" disabled={index === count - 1} onClick={() => onMove(1)}>
+                <ArrowDownward fontSize="small" />
+              </IconButton>
+            </>
+          )}
+          <IconButton aria-label={`Remove ${entry['schema:name'] || `entry ${index + 1}`}`} size="small" onClick={onRemove}>
+            <DeleteOutline fontSize="small" />
+          </IconButton>
+        </Box>
+      </Stack>
+      {more && (
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ pl: ordered ? 3.5 : 0, pt: 0.75, pb: 0.5, '& .MuiFormControl-root': { mt: 0 } }}>
           <TextField
             id={`${idBase}-identifier`}
             label={isOrg ? 'ROR or other identifier' : 'ORCID or other identifier'}
-            size="small"
             fullWidth
             value={identifier}
             onChange={(e) => set('schema:identifier', e.target.value)}
@@ -115,25 +140,12 @@ function PartyRow({ entry, index, count, ordered, withRole, onChange, onMove, on
             <OrganisationField
               id={`${idBase}-affiliation`}
               label="Affiliation"
-              value={entry['schema:affiliation']?.['schema:name']}
+              value={affiliation}
               onChange={(name) => set('schema:affiliation', { '@type': ORGANISATION, 'schema:name': name })}
             />
           )}
-          {withRole && (
-            <TextField
-              id={`${idBase}-role`}
-              label="Role"
-              size="small"
-              fullWidth
-              required
-              error={!entry['schema:roleName']}
-              helperText="What they did. For example: editor, data collector, laboratory analyst."
-              value={entry['schema:roleName'] || ''}
-              onChange={(e) => set('schema:roleName', e.target.value)}
-            />
-          )}
         </Stack>
-      </Stack>
+      )}
     </Paper>
   );
 }
