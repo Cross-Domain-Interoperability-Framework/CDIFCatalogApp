@@ -375,7 +375,7 @@ Where each day stands on 23 November 2026:
 | 7 | Done. |
 | 8 | Report done. The completeness indicator is not built. |
 | 9 | Done on 23 November 2026, by script and not by hand: all five example records submit valid. What could not be entered, and what a person would trip on, is in `docs/form-inventory.md`. |
-| 10 | Not started. |
+| 10 | Not held. How to run the sessions, with the task sheet, the observation sheet and the result page, is in `docs/scientist-sessions.md`. |
 
 ### Early stop
 
@@ -384,7 +384,7 @@ If the day 2 inventory shows the stock form is unusable in ways the planned cust
 ### Needed before day 1
 
 - Done: an ORCID sandbox API client registered, for sign-in and author search. Sign-in worked against the sandbox on 19 November 2026.
-- Three scientists booked for day 10, none of whom has seen CDIF. Not recorded as done.
+- Three scientists booked for day 10, none of whom has seen CDIF. Not recorded as done. Each also needs a sandbox ORCID account made for them beforehand (`docs/scientist-sessions.md`).
 - Done: a web address with HTTPS for the test sessions, which ORCID sign-in requires outside a developer's own machine. The prototype is deployed on a free Render service (`docs/deploy-render.md`), where sign-in with the ORCID sandbox worked on 23 November 2026.
 - Done: this repository, public, in the Cross-Domain-Interoperability-Framework organisation.
 
