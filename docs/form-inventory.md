@@ -169,7 +169,9 @@ All five were filed there on 17 November 2026: [#106](https://github.com/Cross-D
    schema gives it no default and the layout has no field for it, so the record fails with a
    fault the author cannot fix. The server adds the marker on the way in. Filed as
    [#113](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/113).
-7. Found in the dry run, 23 November 2026, and not yet filed: in `uischema.json` the two controls
+7. Found in the dry run, 23 November 2026, and filed as
+   [#114](https://github.com/Cross-Domain-Interoperability-Framework/metadataBuildingBlocks/issues/114):
+   in `uischema.json` the two controls
    under a related link are scoped `#/properties/target/properties/schema:name` and
    `.../schema:url`. The schema's property is `schema:target`, so what a link points to cannot
    be entered.
