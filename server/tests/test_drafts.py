@@ -10,6 +10,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
+from app import access, auth
 from app.main import app
 
 
@@ -98,3 +99,51 @@ def test_a_valid_record_submits_and_an_edit_makes_it_a_draft_again(client):
 
 def test_submitting_an_unknown_draft_is_404(client):
     assert client.post(f"/api/drafts/{uuid4()}/submit").status_code == 404
+
+
+def signed_in_as(user_id):
+    """Sign-in itself is tested in test_auth.py; here the person is simply assumed. None signs out."""
+    user = access.User(id=user_id) if user_id else access.ANONYMOUS
+    app.dependency_overrides[auth.current_user] = lambda: user
+
+
+@pytest.fixture
+def people():
+    yield signed_in_as
+    app.dependency_overrides.pop(auth.current_user, None)
+
+
+def test_a_draft_saved_while_signed_in_does_not_exist_for_anyone_else(client, people):
+    people("test-ana")
+    draft = new_draft(client, VALID)
+    address = f"/api/drafts/{draft['id']}"
+    for other in ("test-ben", None):
+        people(other)
+        assert client.get(address).status_code == 404
+        assert client.put(address, json={"document": {"schema:name": "taken"}}).status_code == 404
+        assert client.post(f"{address}/submit").status_code == 404
+    people("test-ana")
+    assert client.get(address).json()["document"] == VALID
+    assert client.post(f"{address}/submit").json()["submitted"] is True
+
+
+def test_a_draft_started_signed_out_becomes_the_persons_own_when_they_save_it(client, people):
+    draft = new_draft(client, {"schema:name": "begun signed out"})
+    address = f"/api/drafts/{draft['id']}"
+    people("test-ana")
+    assert client.put(address, json={"document": {"schema:name": "kept"}}).status_code == 200
+    people(None)
+    assert client.get(address).status_code == 404
+
+
+def test_a_person_is_listed_their_own_drafts_newest_first_and_nobody_elses(client, people):
+    assert client.get("/api/drafts").json() == []  # nobody signed in
+    people("test-ben")
+    new_draft(client, {"schema:name": "Ben's"})
+    people("test-ana")
+    first = new_draft(client, {"schema:name": "first"})
+    second = new_draft(client, {})
+    listed = client.get("/api/drafts").json()
+    assert [(d["id"], d["name"], d["status"]) for d in listed] == [
+        (second["id"], None, "draft"), (first["id"], "first", "draft"),
+    ]

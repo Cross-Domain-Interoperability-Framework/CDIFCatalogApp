@@ -3,11 +3,11 @@ from contextlib import asynccontextmanager
 from uuid import UUID
 
 import psycopg
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
-from app import auth, lookup, outbound, store, validate
+from app import access, auth, lookup, outbound, store, validate
 from app.harvest import api as harvest_api
 from app.store import connect
 
@@ -72,37 +72,53 @@ class DraftUpdate(BaseModel):
     document: dict
 
 
-# Until sign-in exists, a draft is reachable by anyone who knows its id. The id is a random
-# UUID, which is enough for a local prototype and not enough for a public deployment.
+# A draft saved by a signed-in person is theirs: to anyone else it does not exist. A draft started
+# without signing in has no owner and is reachable by anyone who knows its id, a random UUID. It
+# becomes the person's own the first time they save it signed in.
+MINE = "(owner IS NULL OR owner = %s)"
+
+
+@app.get("/api/drafts")
+def list_drafts(user: access.User = Depends(auth.current_user)) -> list[dict]:
+    """The signed-in person's own drafts, newest first. Nobody signed in: none."""
+    if user.id is None:
+        return []
+    with connect() as conn:
+        return conn.execute(
+            "SELECT id, status, updated_at, document->>'schema:name' AS name FROM drafts "
+            "WHERE owner = %s ORDER BY updated_at DESC",
+            (user.id,),
+        ).fetchall()
 
 
 @app.post("/api/drafts", status_code=201)
-def create_draft(body: NewDraft) -> dict:
+def create_draft(body: NewDraft, user: access.User = Depends(auth.current_user)) -> dict:
     if body.profile not in PROFILES:
         raise HTTPException(422, f"Unknown profile: {body.profile}")
     with connect() as conn:
         return conn.execute(
-            f"INSERT INTO drafts (profile, document) VALUES (%s, %s) RETURNING {COLUMNS}",
-            (body.profile, Jsonb(body.document)),
+            f"INSERT INTO drafts (profile, document, owner) VALUES (%s, %s, %s) RETURNING {COLUMNS}",
+            (body.profile, Jsonb(body.document), user.id),
         ).fetchone()
 
 
 @app.get("/api/drafts/{draft_id}")
-def read_draft(draft_id: UUID) -> dict:
+def read_draft(draft_id: UUID, user: access.User = Depends(auth.current_user)) -> dict:
     with connect() as conn:
-        row = conn.execute(f"SELECT {COLUMNS} FROM drafts WHERE id = %s", (draft_id,)).fetchone()
+        row = conn.execute(f"SELECT {COLUMNS} FROM drafts WHERE id = %s AND {MINE}", (draft_id, user.id)).fetchone()
     if row is None:
         raise HTTPException(404, "No draft with that id.")
     return row
 
 
 @app.put("/api/drafts/{draft_id}")
-def update_draft(draft_id: UUID, body: DraftUpdate) -> dict:
+def update_draft(draft_id: UUID, body: DraftUpdate, user: access.User = Depends(auth.current_user)) -> dict:
     with connect() as conn:
         row = conn.execute(
             # an edit after submission makes it a draft again; it must be checked and submitted anew
-            f"UPDATE drafts SET document = %s, status = 'draft', updated_at = now() WHERE id = %s RETURNING {COLUMNS}",
-            (Jsonb(body.document), draft_id),
+            f"UPDATE drafts SET document = %s, status = 'draft', updated_at = now(), owner = coalesce(owner, %s) "
+            f"WHERE id = %s AND {MINE} RETURNING {COLUMNS}",
+            (Jsonb(body.document), user.id, draft_id, user.id),
         ).fetchone()
     if row is None:
         raise HTTPException(404, "No draft with that id.")
@@ -110,11 +126,12 @@ def update_draft(draft_id: UUID, body: DraftUpdate) -> dict:
 
 
 @app.post("/api/drafts/{draft_id}/submit")
-def submit_draft(draft_id: UUID) -> dict:
+def submit_draft(draft_id: UUID, user: access.User = Depends(auth.current_user)) -> dict:
     """Mark a draft as submitted, but only if the server finds no violation in it. The check is
     made here on the stored document, never taken from what the browser says it found."""
     with connect() as conn:
-        row = conn.execute("SELECT profile, document FROM drafts WHERE id = %s", (draft_id,)).fetchone()
+        row = conn.execute(f"SELECT profile, document FROM drafts WHERE id = %s AND {MINE}", (draft_id, user.id)
+        ).fetchone()
         if row is None:
             raise HTTPException(404, "No draft with that id.")
         report = validate.check(row["profile"], row["document"], str(draft_id))

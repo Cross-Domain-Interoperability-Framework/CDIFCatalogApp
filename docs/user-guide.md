@@ -152,8 +152,11 @@ Two things to know:
 
 - A submitted record is **not published yet**. It does not appear in the feed. Review and
   publishing of submitted records is not built.
-- Your draft is kept under the address you opened the form at, in that browser. It is not tied
-  to your sign-in, so you will not find it from another computer.
+- A record you save while signed in is yours. Nobody else can open it, and when you sign in on
+  another computer it is listed under "Your records", above the form, with a button to open it.
+- A record you start without signing in is kept only by the browser you started it in, and
+  anyone who has its address can read and change it. Sign in and change something in it, and it
+  becomes yours.
 
 "Start a new record" clears the form for another dataset.
 
@@ -300,8 +303,6 @@ Setting up sign-in is described in [setup-sandboxes.md](setup-sandboxes.md).
 - **Harvest pages in the web application.** Harvesting is done through the address list.
 - **Other kinds of source**: CSW, OAI-PMH, sitemaps, CKAN, STAC.
 - **Publishing a submitted record**, and any review step before it.
-- **Drafts tied to your sign-in.** Anyone who has a draft's address can read and change it. Do
-  not put anything private in a draft.
 - **Full checking of the profiles beyond core and discovery.**
 - **Forms for the richer profiles.** The form covers core and discovery.
 

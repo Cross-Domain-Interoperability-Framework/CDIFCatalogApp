@@ -15,7 +15,8 @@ export default function Account() {
 
   async function signOut() {
     await fetch('/api/auth/logout', { method: 'POST' });
-    setMe({ ...me, signed_in: false });
+    // Loaded afresh, because the record on screen may be the person's own and is now closed to this browser.
+    window.location.reload();
   }
 
   // Nothing to show until the server answers, or when it has no ORCID client to sign in with.
