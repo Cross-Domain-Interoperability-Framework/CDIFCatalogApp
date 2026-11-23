@@ -1,0 +1,33 @@
+# Render Blueprint: one web service and one database, both on Render's free plans.
+# docs/deploy-render.md has the steps, what the free plans cost in behaviour, and what to change.
+services:
+  - type: web
+    name: cdif-catalog
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cdif-catalog-db
+          property: connectionString
+      # Sign-in with ORCID. The sandbox is ORCID's test copy; its accounts are separate from real ones.
+      - key: ORCID_BASE
+        value: https://sandbox.orcid.org
+      # Asked for once, when the Blueprint is first created. Never written in this file.
+      - key: ORCID_CLIENT_ID
+        sync: false
+      - key: ORCID_CLIENT_SECRET
+        sync: false
+      # ORCID iDs of the people who may harvest, separated by commas.
+      - key: ADMIN_ORCIDS
+        sync: false
+
+databases:
+  - name: cdif-catalog-db
+    plan: free
+    databaseName: catalog
+    user: catalog
+    postgresMajorVersion: "17"
