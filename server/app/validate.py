@@ -52,7 +52,44 @@ def load(profile: str) -> dict:
         "prefixes": {p: s["const"] for p, s in context_schema.items() if "const" in s},
         "fields": [p for p in schema["properties"] if not p.startswith("@")],
         "conformance": sorted(conformance),
+        "schema": schema,
     }
+
+
+def _parts(schema, root: dict):
+    """A schema with its reference followed, and then each alternative and addition it states."""
+    while isinstance(schema, dict) and str(schema.get("$ref", "")).startswith("#/$defs/"):
+        schema = root["$defs"].get(schema["$ref"][8:])
+    if not isinstance(schema, dict):
+        return
+    yield schema
+    for word in ("allOf", "anyOf", "oneOf"):
+        for part in schema.get(word, []):
+            yield from _parts(part, root)
+
+
+def _add_type_markers(value, schema, root: dict) -> None:
+    """Give each group that has no type marker the one the schema says it must include: the
+    first, where the schema allows a choice. The form's files give a marker held as one word a
+    default, but not one held as a list (a measured variable, a funding identifier, a checksum,
+    an activity), and the form has no field for any of them. A group holding only an address
+    is a reference to something described elsewhere, and is left as it is."""
+    if isinstance(value, dict) and set(value) == {"@id"}:
+        return
+    for part in _parts(schema, root):
+        if isinstance(value, list):
+            for item in value:
+                _add_type_markers(item, part.get("items"), root)
+        elif isinstance(value, dict):
+            properties = part.get("properties", {})
+            for wanted in _parts(properties.get("@type"), root):
+                marker = wanted.get("contains", {})
+                found = next((c["const"] for c in marker.get("anyOf", [marker]) if "const" in c), None)
+                if found:
+                    value.setdefault("@type", [found])
+            for key, sub in properties.items():
+                if key in value:
+                    _add_type_markers(value[key], sub, root)
 
 
 @lru_cache
@@ -125,9 +162,10 @@ def declare(profile: str, record: dict) -> dict:
 
 def strip_empty(value):
     """Remove what the form leaves behind for untouched fields: blank text, empty lists, and
-    objects holding nothing but a type marker. Returns None when nothing is left."""
+    objects holding nothing but a type marker. Returns None when nothing is left. Spaces around
+    a value go too: an address pasted with a space before it is otherwise not an address."""
     if isinstance(value, str):
-        return value if value.strip() else None
+        return value.strip() or None
     if isinstance(value, list):
         items = [x for x in (strip_empty(v) for v in value) if x is not None]
         return items or None
@@ -161,6 +199,7 @@ def prepare(profile: str, document: dict, record_id: str | None = None) -> dict:
             ]
 
     spec = load(level_for(profile, record))
+    _add_type_markers(record, spec["schema"], spec["schema"])
     record["@context"] = {**context, **spec["prefixes"]}
     record.setdefault("@type", ["schema:Dataset"])
     record.setdefault("@id", f"urn:uuid:{record_id or uuid.uuid4()}")

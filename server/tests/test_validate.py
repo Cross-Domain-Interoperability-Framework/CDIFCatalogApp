@@ -128,6 +128,35 @@ def test_a_licence_with_no_address_is_kept_as_text():
     assert report["record"]["schema:license"] == ["open access"]
 
 
+def test_spaces_around_a_pasted_address_do_not_make_it_a_fault():
+    doc = filled()
+    address = "https://creativecommons.org/licenses/by/4.0/"
+    doc["schema:license"] = [{"@type": "schema:CreativeWork", "schema:name": "CC BY 4.0", "schema:url": f" {address} "}]
+    report = validate.check("CoreDiscovery", doc)
+    assert violations(report["findings"]) == []
+    assert report["record"]["schema:license"][0]["schema:url"] == address
+
+
+def test_groups_are_given_the_type_markers_the_form_cannot_hold():
+    # Each of these groups is as the form writes it: no type marker, because the form has no
+    # field for one and its files give no default.
+    doc = filled()
+    doc["schema:variableMeasured"] = [
+        {"schema:name": "temperature", "schema:unitText": "degrees Celsius", "schema:description": "air temperature"}
+    ]
+    doc["prov:wasGeneratedBy"] = [{"prov:used": ["mass spectrometer"]}]
+    doc["schema:funding"] = [{
+        "@type": "schema:MonetaryGrant", "schema:name": "Grant 1",
+        "schema:identifier": {"schema:propertyID": "https://example.org/grants", "schema:value": "G-1"},
+    }]
+    report = validate.check("CoreDiscovery", doc)
+    assert [f for f in violations(report["findings"]) if "@type" in f["path"]] == []
+    record = report["record"]
+    assert record["schema:variableMeasured"][0]["@type"] == ["schema:PropertyValue"]
+    assert record["prov:wasGeneratedBy"][0]["@type"] == ["prov:Activity"]
+    assert record["schema:funding"][0]["schema:identifier"]["@type"] == ["schema:PropertyValue"]
+
+
 def test_either_a_landing_page_or_a_distribution_is_reported_once():
     doc = filled()
     del doc["schema:url"]
@@ -203,7 +232,7 @@ def test_a_discovery_field_filled_in_wrongly_is_still_reported():
 
 def test_strip_empty():
     assert validate.strip_empty({"a": "", "b": [], "c": {"@type": "x"}, "d": {"@list": []}}) is None
-    assert validate.strip_empty({"a": " x ", "b": [{"@type": "T", "n": 0}]}) == {"a": " x ", "b": [{"@type": ["T"], "n": 0}]}
+    assert validate.strip_empty({"a": " x ", "b": [{"@type": "T", "n": 0}]}) == {"a": "x", "b": [{"@type": ["T"], "n": 0}]}
 
 
 def test_endpoint():
