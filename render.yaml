@@ -4,6 +4,8 @@ services:
   - type: web
     name: cdif-catalog
     runtime: docker
+    # Deploy from main whichever branch the Blueprint itself was created from.
+    branch: main
     dockerfilePath: ./deploy/Dockerfile
     dockerContext: .
     plan: free
