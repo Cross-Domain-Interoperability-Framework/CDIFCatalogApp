@@ -10,11 +10,12 @@ import Drafts from './Drafts.jsx';
 import { fitRecord } from './fit.js';
 import Report, { fieldIndex } from './Report.jsx';
 import { customRenderers } from './renderers.jsx';
-import { sectionRenderer } from './Section.jsx';
+import { rowListRenderer } from './RowList.jsx';
+import { sectionRenderer, SectionsToggle } from './Section.jsx';
 import theme from './theme.js';
 import { labelOf, translator, withWordingKeys } from './wording.js';
 
-const renderers = [...materialRenderers, ...customRenderers, sectionRenderer];
+const renderers = [...materialRenderers, ...customRenderers, sectionRenderer, rowListRenderer];
 
 const PROFILE = 'CoreDiscovery';
 const DRAFT_KEY = `cdif-draft-id:${PROFILE}`;
@@ -296,6 +297,9 @@ export default function App() {
       <Drafts current={openId} onOpen={open} />
       <DoiPrefill data={data} defaults={form.defaults} onFill={fill} />
       <Completeness data={data} defaults={form.defaults} fields={fields} />
+      <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+        <SectionsToggle />
+      </Stack>
       <Box sx={{ my: 2 }}>
         <JsonForms
           key={formKey}
