@@ -48,4 +48,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
+      - name: deploy/Dockerfile fetches the converters commit the submodule is pinned to
+        working-directory: .
+        run: grep "CONVERTERS_COMMIT=$(git rev-parse HEAD:server/converters)" deploy/Dockerfile
       - run: pytest
