@@ -145,8 +145,8 @@
     "label": "How it is related",
     "help": "For example: documentation, described in, source code."
   },
-  "schema:relatedLink/target/schema:name": { "label": "Name of the linked item" },
-  "schema:relatedLink/target/schema:url": { "label": "Web address" },
+  "schema:relatedLink/schema:target/schema:name": { "label": "Name of the linked item" },
+  "schema:relatedLink/schema:target/schema:url": { "label": "Web address" },
   "schema:publishingPrinciples": {
     "label": "Publishing policies",
     "help": "Optional. Policies the dataset was published under, such as a repository's data policy."
