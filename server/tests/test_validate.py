@@ -157,6 +157,23 @@ def test_groups_are_given_the_type_markers_the_form_cannot_hold():
     assert record["schema:funding"][0]["schema:identifier"]["@type"] == ["schema:PropertyValue"]
 
 
+def test_a_contributor_with_a_role_is_stored_as_the_role_with_the_person_inside():
+    doc = filled()
+    doc["schema:contributor"] = [
+        {"@type": "schema:Person", "schema:name": "Joe Test", "schema:roleName": "editor"},
+        {"@type": "schema:Organization", "schema:name": "A lab with no role given"},
+    ]
+    report = validate.check("CoreDiscovery", doc)
+    assert violations(report["findings"]) == []
+    with_role, without = report["record"]["schema:contributor"]
+    assert with_role == {
+        "@type": ["schema:Role"],
+        "schema:roleName": "editor",
+        "schema:contributor": {"@type": ["schema:Person"], "schema:name": "Joe Test"},
+    }
+    assert without == {"@type": ["schema:Organization"], "schema:name": "A lab with no role given"}
+
+
 def test_either_a_landing_page_or_a_distribution_is_reported_once():
     doc = filled()
     del doc["schema:url"]

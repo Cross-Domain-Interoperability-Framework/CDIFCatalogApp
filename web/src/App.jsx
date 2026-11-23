@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
-import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Container, CssBaseline, Stack, ThemeProvider, Typography } from '@mui/material';
 import Account from './Account.jsx';
 import Completeness from './Completeness.jsx';
 import { correctDefaults, correctLayout, correctSchema } from './corrections.js';
@@ -10,9 +10,11 @@ import Drafts from './Drafts.jsx';
 import { fitRecord } from './fit.js';
 import Report, { fieldIndex } from './Report.jsx';
 import { customRenderers } from './renderers.jsx';
+import { sectionRenderer } from './Section.jsx';
+import theme from './theme.js';
 import { labelOf, translator, withWordingKeys } from './wording.js';
 
-const renderers = [...materialRenderers, ...customRenderers];
+const renderers = [...materialRenderers, ...customRenderers, sectionRenderer];
 
 const PROFILE = 'CoreDiscovery';
 const DRAFT_KEY = `cdif-draft-id:${PROFILE}`;
@@ -262,7 +264,8 @@ export default function App() {
   }[saveState.kind];
 
   return (
-    <Container maxWidth="md" sx={{ py: 3 }}>
+    <ThemeProvider theme={theme}>
+    <Container maxWidth="md" sx={{ py: 2 }}>
       <CssBaseline />
       <Stack direction="row" sx={{ justifyContent: 'flex-end', minHeight: 32 }}>
         <Account />
@@ -321,5 +324,6 @@ export default function App() {
         </pre>
       </details>
     </Container>
+    </ThemeProvider>
   );
 }
