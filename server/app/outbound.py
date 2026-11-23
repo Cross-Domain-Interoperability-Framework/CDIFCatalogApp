@@ -174,7 +174,8 @@ def record(
         "Link": ", ".join(f'<{href}>; rel="alternate"; type="{media.split(";")[0]}"' for href, media, _ in alternates),
     }
     if chosen == "html":
-        return Response(_page(cdif, alternates), media_type="text/html", headers=headers)
+        copy = f"{public_url(request)}/?copy={record_id}"
+        return Response(_page(cdif, alternates, copy), media_type="text/html", headers=headers)
     if chosen == "cdif":
         body = json.dumps(cdif, ensure_ascii=False, indent=2)
         return Response(body, media_type="application/ld+json", headers=headers)
@@ -204,7 +205,7 @@ def _linked(text: str) -> str:
     return f'<a href="{_e(text, quote=True)}">{_e(text)}</a>' if text.startswith(("http://", "https://")) else _e(text)
 
 
-def _page(cdif: dict, alternates) -> str:
+def _page(cdif: dict, alternates, copy: str) -> str:
     title = dcat._text(cdif.get("schema:name")) or "Untitled record"
     description = cdif.get("schema:description") if isinstance(cdif.get("schema:description"), str) else ""
     identifier = cdif.get("schema:identifier")
@@ -247,5 +248,6 @@ def _page(cdif: dict, alternates) -> str:
         "dt{font-weight:600;margin-top:.75rem}dd{margin:0;overflow-wrap:anywhere}"
         "footer{margin-top:2rem;border-top:1px solid #ccc;padding-top:.75rem;font-size:.9rem}</style></head>"
         f"<body><main><h1>{_e(title)}</h1><p>{_e(description)}</p><dl>{facts}</dl></main>"
-        f"<footer>This record in other formats: {formats}</footer></body></html>"
+        f"<footer>This record in other formats: {formats}"
+        f'<br><a href="{_e(copy, quote=True)}">Open a copy of this record in the form</a></footer></body></html>'
     )

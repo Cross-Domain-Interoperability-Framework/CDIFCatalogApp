@@ -120,6 +120,14 @@ def test_an_access_condition_with_no_address_is_kept_as_text_and_stands_in_for_a
     assert kept[2]["schema:url"] == "https://repository.example/terms"
 
 
+def test_a_licence_with_no_address_is_kept_as_text():
+    doc = filled()
+    doc["schema:license"] = [{"@type": "schema:CreativeWork", "schema:name": "open access"}]
+    report = validate.check("CoreDiscovery", doc)
+    assert violations(report["findings"]) == []
+    assert report["record"]["schema:license"] == ["open access"]
+
+
 def test_either_a_landing_page_or_a_distribution_is_reported_once():
     doc = filled()
     del doc["schema:url"]

@@ -4,6 +4,7 @@ import { materialCells, materialRenderers } from '@jsonforms/material-renderers'
 import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
 import Account from './Account.jsx';
 import DoiPrefill from './DoiPrefill.jsx';
+import { fitRecord } from './fit.js';
 import Report, { fieldIndex } from './Report.jsx';
 import { customRenderers } from './renderers.jsx';
 import { labelOf, translator, withWordingKeys } from './wording.js';
@@ -51,6 +52,27 @@ function rememberDraftId(id) {
   }
 }
 
+// A record page links here with ?copy=<record id> to open a copy of that record in the form.
+// The id is taken out of the address at once, so a reload opens the saved copy, not a fresh one.
+function takeCopyId() {
+  const url = new URL(window.location.href);
+  const id = url.searchParams.get('copy');
+  if (id) {
+    url.searchParams.delete('copy');
+    window.history.replaceState(null, '', url);
+  }
+  return id;
+}
+
+const REPLACE_DRAFT = 'You have a record in progress in this browser. Opening this copy starts a new '
+  + 'record, and the one in progress will no longer open here. Open the copy?';
+
+// Decided once when the page loads, because the form's start-up runs twice in development.
+const COPY_ID = (() => {
+  const id = takeCopyId();
+  return id && (!storedDraftId() || window.confirm(REPLACE_DRAFT)) ? id : null;
+})();
+
 const timeOf = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 export default function App() {
@@ -62,6 +84,7 @@ export default function App() {
   const [loadError, setLoadError] = useState(null);
   const [saveState, setSaveState] = useState({ kind: 'new' });
   const [formKey, setFormKey] = useState(0);
+  const [copied, setCopied] = useState(null); // { name } of the record this draft began as, or { failed }
 
   const draftId = useRef(null);
   const savedText = useRef(null); // the document as last loaded or saved, as JSON text
@@ -79,7 +102,18 @@ export default function App() {
       let document = defaults;
       let state = { kind: 'new' };
       const id = storedDraftId();
-      if (id) {
+      let copy = null;
+      if (COPY_ID) {
+        const res = await fetch(`/records/${encodeURIComponent(COPY_ID)}?format=cdif`);
+        if (res.ok) {
+          copy = fitRecord(await res.json(), schema);
+        } else if (!cancelled) {
+          setCopied({ failed: true });
+        }
+      }
+      if (copy) {
+        document = copy;
+      } else if (id) {
         try {
           const draft = await api('GET', `/api/drafts/${id}`);
           document = draft.document;
@@ -92,7 +126,13 @@ export default function App() {
         }
       }
       if (cancelled) return;
-      savedText.current = JSON.stringify(document);
+      // A copy is not saved yet: leave it looking unsaved, so it is saved as a new record at once.
+      savedText.current = copy ? null : JSON.stringify(document);
+      if (copy) {
+        latest.current = copy;
+        setCopied({ name: typeof copy['schema:name'] === 'string' ? copy['schema:name'] : '' });
+        timer.current = setTimeout(save, 0);
+      }
       setForm({ schema, uischema: withWordingKeys(uischema), defaults });
       setData(document);
       setSaveState(state);
@@ -166,6 +206,7 @@ export default function App() {
     setSaveState({ kind: 'new' });
     setReport(null);
     setSubmitted(false);
+    setCopied(null);
     setFormKey((k) => k + 1); // remount so the form drops its own copy of the old record
   }
 
@@ -220,6 +261,17 @@ export default function App() {
       >
         {saveText}
       </Typography>
+      {copied && (copied.failed ? (
+        <Alert severity="warning" sx={{ mt: 1 }} onClose={() => setCopied(null)}>
+          That record could not be opened. It may have been withdrawn.
+        </Alert>
+      ) : (
+        <Alert severity="info" sx={{ mt: 1 }} onClose={() => setCopied(null)} data-testid="copy-note">
+          This is a copy of the catalog record{copied.name ? ` "${copied.name}"` : ''}. It is a new record of your
+          own: changing it does not change the record in the catalog. Some details were simplified to fit the
+          form, and parts the form has no fields for are kept as they were.
+        </Alert>
+      ))}
       <DoiPrefill data={data} onFill={fill} />
       <Box sx={{ my: 2 }}>
         <JsonForms

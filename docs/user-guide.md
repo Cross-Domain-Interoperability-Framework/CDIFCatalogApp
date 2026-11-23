@@ -109,6 +109,20 @@ Software can ask for the form it wants with an `Accept` header instead.
 **To see which profiles a record claims**, open it with `?format=cdif` and find `schema:subjectOf`,
 then `dcterms:conformsTo` inside it. That list is the record's claims.
 
+### Opening a record in the form
+
+At the foot of a record's summary page is a link, **Open a copy of this record in the form**. It
+opens the form filled in from that record, as a new record of your own. Changing the copy does
+not change the record in the catalog; editing a harvested record itself is not built yet.
+
+The form shows less than a record can hold. Where a record says something in a way the form has
+no field for, the copy is simplified: a keyword taken from a vocabulary becomes its label, for
+example. Parts the form has no fields for at all, such as how the data were structured, are
+kept in the copy unchanged but cannot be seen or edited there.
+
+If you already have a record in progress in the same browser, you are asked first, because
+opening the copy takes its place.
+
 ## Describing a dataset with the form
 
 The page at http://127.0.0.1:5173 is a form for describing one dataset. It follows the core and
