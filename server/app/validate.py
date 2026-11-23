@@ -148,16 +148,17 @@ def prepare(profile: str, document: dict, record_id: str | None = None) -> dict:
     record = strip_empty({k: v for k, v in document.items() if k != "@context"}) or {}
     record = copy.deepcopy(record)
 
-    # The form holds each access condition as a group of fields, and the schema takes such a
-    # group only when it has a web address. One with no address is a plain statement, which the
-    # schema takes as text.
-    conditions = record.get("schema:conditionsOfAccess")
-    if isinstance(conditions, list):
-        record["schema:conditionsOfAccess"] = [
-            ": ".join(c[k] for k in ("schema:name", "schema:description") if c.get(k))
-            if isinstance(c, dict) and c.get("schema:name") and not c.get("schema:url") else c
-            for c in conditions
-        ]
+    # The form holds each access condition and each licence as a group of fields, and the schema
+    # takes such a group only when it has a web address. One with no address is a plain
+    # statement, which the schema takes as text.
+    for field in ("schema:conditionsOfAccess", "schema:license"):
+        groups = record.get(field)
+        if isinstance(groups, list):
+            record[field] = [
+                ": ".join(c[k] for k in ("schema:name", "schema:description") if c.get(k))
+                if isinstance(c, dict) and c.get("schema:name") and not c.get("schema:url") else c
+                for c in groups
+            ]
 
     spec = load(level_for(profile, record))
     record["@context"] = {**context, **spec["prefixes"]}

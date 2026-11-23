@@ -155,6 +155,11 @@ def test_the_page_embeds_the_record_and_escapes_what_it_shows(catalog):
     assert json.loads(embedded)["schema:description"] == "ends </script> early"
 
 
+def test_the_page_links_to_a_copy_of_the_record_in_the_form(catalog):
+    record = catalog.add(MINIMAL)
+    assert f'<a href="{BASE}/?copy={record}">Open a copy of this record in the form</a>' in catalog.get(f"/records/{record}").text
+
+
 def test_an_unpublished_or_unknown_record_is_not_found(catalog):
     assert catalog.get(f"/records/{catalog.add(MINIMAL, status='invalid')}").status_code == 404
     assert catalog.get(f"/records/{uuid4()}").status_code == 404
