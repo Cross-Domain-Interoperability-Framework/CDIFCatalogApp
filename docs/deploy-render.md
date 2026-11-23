@@ -61,11 +61,18 @@ the service only if it is later given a different address, such as a custom doma
 
 ## Not checked
 
-- **Whether Render fetches git submodules.** The converters are a submodule with another inside
-  it, and Render's documentation pages read for this did not say. The build stops with a message
-  naming the missing submodule if they do not arrive. If that happens, the converters have to
-  reach the image another way; that is not built.
+- **Large records.** DDI or FAIR2 records with hundreds of variables were not tried under the
+  memory limit.
 - **The whole deployment.** Nobody has run these steps.
+
+## The converters in the image
+
+Render does not fetch git submodules: a first build on 23 November 2026 stopped because the
+converters were missing. `deploy/Dockerfile` therefore fetches them itself from GitHub, at a
+commit written in that file (`CONVERTERS_COMMIT`), together with the validation repository inside
+them. That commit must be the one the `server/converters` submodule is pinned to. When the
+submodule is moved, change the line in `deploy/Dockerfile` in the same pull request; CI fails if
+the two differ.
 
 ## What a visitor should know
 

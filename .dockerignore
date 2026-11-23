@@ -4,5 +4,7 @@
 .env
 **/node_modules
 web/dist
+# fetched inside the image, not copied from the checkout
+server/converters
 **/__pycache__
 **/.pytest_cache

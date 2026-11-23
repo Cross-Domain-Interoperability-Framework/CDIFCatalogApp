@@ -59,7 +59,8 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
 - **`server/converters` is a git submodule and is not edited here.** A converter's defect is an
   issue for the `converters` repository. To move to a newer commit: `git -C server/converters
   fetch && git -C server/converters checkout <commit>`, run the tests, then commit the submodule
-  pointer. `test_converters.py` runs the real converters on their own examples and fails if the
+  pointer, and change `CONVERTERS_COMMIT` in `deploy/Dockerfile` to the same commit (Render does
+  not fetch submodules, so that image fetches the converters itself; CI fails if the two differ). `test_converters.py` runs the real converters on their own examples and fails if the
   submodule is missing or a converter's call signature has changed.
 - **A converted record's conformance claim comes from `detect_conformance.py`**, in the
   converters' nested `validation` submodule, which must be fetched (`--recursive`). The
