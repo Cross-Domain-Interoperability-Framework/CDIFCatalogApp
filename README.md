@@ -111,6 +111,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | File | What it is |
 |---|---|
 | `design.md` | The design: why replace the Java applications, the architecture, how records are stored, user groups, outbound formats, and the prototype's build plan with its pass and fail criteria. |
+| `user-guide.md` | A guide for someone new to the catalog: what it is for, how CDIF profiles stack, and how to read records, fill in the form and harvest. |
 | `form-inventory.md` | What is wrong with the stock generated form, found by using it, and the five issues raised with metadataBuildingBlocks. |
 | `setup-sandboxes.md` | How to register an ORCID sandbox client, and when a DataCite test account is needed. |
 
