@@ -3,7 +3,7 @@ import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
 import Account from './Account.jsx';
-import { correctLayout, correctSchema } from './corrections.js';
+import { correctDefaults, correctLayout, correctSchema } from './corrections.js';
 import DoiPrefill from './DoiPrefill.jsx';
 import Drafts from './Drafts.jsx';
 import { fitRecord } from './fit.js';
@@ -99,11 +99,12 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [rawSchema, rawLayout, defaults] = await Promise.all(
+      const [rawSchema, rawLayout, rawDefaults] = await Promise.all(
         ['schema', 'uischema', 'defaults'].map(loadJson),
       );
       const schema = correctSchema(rawSchema);
       const uischema = correctLayout(rawLayout);
+      const defaults = correctDefaults(rawDefaults);
       let document = defaults;
       let state = { kind: 'new' };
       const id = storedDraftId();
@@ -289,7 +290,7 @@ export default function App() {
         </Alert>
       ))}
       <Drafts current={openId} onOpen={open} />
-      <DoiPrefill data={data} onFill={fill} />
+      <DoiPrefill data={data} defaults={form.defaults} onFill={fill} />
       <Box sx={{ my: 2 }}>
         <JsonForms
           key={formKey}

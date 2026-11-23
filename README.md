@@ -163,7 +163,8 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 |---|---|
 | `src/main.jsx` | Entry point. |
 | `src/App.jsx` | The page: loads the form files, saves the draft as you type, and connects the parts below. |
-| `src/corrections.js` | Corrections laid over the copied form files when the form loads, one for each known defect in them. |
+| `src/corrections.js` | Corrections laid over the copied form files when the form loads: one for each known defect in them, and two choices made here (no "kind of resource" field; language starts as English). |
+| `src/Language.jsx` | The language field: a box that offers ten common languages and still takes any text. |
 | `src/Drafts.jsx` | The signed-in person's list of their own records, each with a button to open it. |
 | `src/DoiPrefill.jsx` | The "Start from a DOI" box. Fills only fields that are still empty. |
 | `src/fit.js` | Reshapes a catalog record into the document the form edits, so a copy of a published record can be opened in the form. Follows the form's own schema; simplifies what the form cannot show. |

@@ -27,13 +27,14 @@ export function isEmpty(v) {
   return false;
 }
 
-// Fill only what is empty. Returns the new record and which fields were filled or left alone.
-export function mergeIntoEmpty(data, found) {
+// Fill only what is empty, or still holds the value a new record starts with (the language).
+// Returns the new record and which fields were filled or left alone.
+export function mergeIntoEmpty(data, found, defaults = {}) {
   const next = { ...data };
   const filled = [];
   const kept = [];
   for (const [key, value] of Object.entries(found)) {
-    if (isEmpty(data[key])) {
+    if (isEmpty(data[key]) || data[key] === defaults[key]) {
       next[key] = value;
       filled.push(LABELS[key] || key);
     } else {
@@ -43,7 +44,7 @@ export function mergeIntoEmpty(data, found) {
   return { next, filled, kept };
 }
 
-export default function DoiPrefill({ data, onFill }) {
+export default function DoiPrefill({ data, defaults, onFill }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
@@ -54,7 +55,7 @@ export default function DoiPrefill({ data, onFill }) {
     setResult(null);
     try {
       const { source, record } = await lookup('doi', { doi: text });
-      const { next, filled, kept } = mergeIntoEmpty(data, record);
+      const { next, filled, kept } = mergeIntoEmpty(data, record, defaults);
       if (filled.length) onFill(next);
       setResult({ severity: filled.length ? 'success' : 'info', source, filled, kept });
     } catch (err) {

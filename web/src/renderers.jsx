@@ -19,6 +19,7 @@ import ArrowDownward from '@mui/icons-material/ArrowDownward';
 import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import DeleteOutline from '@mui/icons-material/DeleteOutline';
 import { useState } from 'react';
+import Language from './Language.jsx';
 import { OrganisationField, RegistrySearch } from './lookup.jsx';
 
 const PERSON = 'schema:Person';
@@ -247,4 +248,5 @@ export const customRenderers = [
     tester: rankWith(10, scopeEndsWith('schema:funder/properties/schema:name')),
     renderer: withJsonFormsControlProps(organisationName(false)),
   },
+  { tester: rankWith(10, scopeEndsWith('#/properties/schema:inLanguage')), renderer: withJsonFormsControlProps(Language) },
 ];
