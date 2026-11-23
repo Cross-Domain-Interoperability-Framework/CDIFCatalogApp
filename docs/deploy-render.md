@@ -76,8 +76,8 @@ the two differ.
 
 ## What a visitor should know
 
-- **A draft has no owner.** Anyone with a draft's address can read and change it, signed in or
-  not. Do not put anything into the form on a public address that should not be seen.
+- **A record started without signing in has no owner.** Anyone with its address can read and
+  change it. A record saved while signed in can be opened only by the person who saved it.
 - **Sign-in uses ORCID's sandbox**, whose accounts are separate from real ORCID accounts. A
   colleague who wants to sign in needs a sandbox account. Looking at records and filling in the
   form need no sign-in.

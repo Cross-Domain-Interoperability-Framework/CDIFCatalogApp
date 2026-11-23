@@ -4,6 +4,7 @@ import { materialCells, materialRenderers } from '@jsonforms/material-renderers'
 import { Alert, Box, Button, Container, CssBaseline, Stack, Typography } from '@mui/material';
 import Account from './Account.jsx';
 import DoiPrefill from './DoiPrefill.jsx';
+import Drafts from './Drafts.jsx';
 import { fitRecord } from './fit.js';
 import Report, { fieldIndex } from './Report.jsx';
 import { customRenderers } from './renderers.jsx';
@@ -84,6 +85,7 @@ export default function App() {
   const [loadError, setLoadError] = useState(null);
   const [saveState, setSaveState] = useState({ kind: 'new' });
   const [formKey, setFormKey] = useState(0);
+  const [openId, setOpenId] = useState(null); // the draft on screen, for the list of the person's records
   const [copied, setCopied] = useState(null); // { name } of the record this draft began as, or { failed }
 
   const draftId = useRef(null);
@@ -118,6 +120,7 @@ export default function App() {
           const draft = await api('GET', `/api/drafts/${id}`);
           document = draft.document;
           draftId.current = draft.id;
+          setOpenId(draft.id);
           state = { kind: 'saved', at: draft.updated_at, submitted: draft.status === 'submitted' };
         } catch (e) {
           // 404: the draft is gone, start fresh. Anything else: keep the id and say so.
@@ -157,6 +160,7 @@ export default function App() {
         ? await api('PUT', `/api/drafts/${draftId.current}`, { document })
         : await api('POST', '/api/drafts', { profile: PROFILE, document });
       draftId.current = draft.id;
+      setOpenId(draft.id);
       rememberDraftId(draft.id);
       savedText.current = text;
       failed.current = false;
@@ -199,6 +203,7 @@ export default function App() {
     clearTimeout(timer.current);
     rememberDraftId(null);
     draftId.current = null;
+    setOpenId(null);
     failed.current = false;
     savedText.current = JSON.stringify(form.defaults);
     latest.current = form.defaults;
@@ -208,6 +213,14 @@ export default function App() {
     setSubmitted(false);
     setCopied(null);
     setFormKey((k) => k + 1); // remount so the form drops its own copy of the old record
+  }
+
+  // Opening another of the person's records: save this one, then load the page afresh on that one.
+  async function open(id) {
+    clearTimeout(timer.current);
+    await save();
+    rememberDraftId(id);
+    window.location.reload();
   }
 
   async function check() {
@@ -272,6 +285,7 @@ export default function App() {
           form, and parts the form has no fields for are kept as they were.
         </Alert>
       ))}
+      <Drafts current={openId} onOpen={open} />
       <DoiPrefill data={data} onFill={fill} />
       <Box sx={{ my: 2 }}>
         <JsonForms

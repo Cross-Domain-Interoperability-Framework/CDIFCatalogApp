@@ -15,8 +15,8 @@ This file covers only the commands and the traps.
 An early prototype. Built: the `CoreDiscovery` submission form (draft saving, ORCID/ROR pickers,
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
 web folders with a worker; the DCAT catalog feed; record addresses with content negotiation; and
-label-based access; and sign-in with ORCID, with an admin-only harvest API. Not built: ownership
-of drafts, the dry run and scientist sessions (plan days 9 and 10),
+label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
+the signed-in user. Not built: the dry run and scientist sessions (plan days 9 and 10),
 other harvesters, mappings into CDIF, publishing of submitted records, search, CSW, OGC API
 Records and the sitemap. Do not start those without being asked.
 
@@ -170,5 +170,7 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   `/api/auth/me`). Do not compare the request's `Host` header with `PUBLIC_URL` on the server:
   the Vite proxy rewrites it to `api:8000`, and a redirect built on that comparison loops. A draft started under one name is not found under the other, because the browser keeps
   each name's storage apart.
-- **Drafts have no owner yet.** Anyone with a draft's id can read and change it, signed in or
-  not. Acceptable only on a developer machine; tying drafts to the signed-in user is the next server step.
+- **A draft belongs to whoever was signed in when it was saved** (`drafts.owner`, the user's id).
+  Every draft query carries the `MINE` condition in `main.py`, which answers 404 to anyone else;
+  a new draft route must carry it too. A draft started signed out has no owner, is open to anyone
+  with its id, and is claimed by the first signed-in save.

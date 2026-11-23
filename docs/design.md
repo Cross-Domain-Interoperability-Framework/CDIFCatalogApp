@@ -281,7 +281,7 @@ The form schema for each profile is already generated from the building blocks. 
 
 ### Where the build stands
 
-As of 23 November 2026. The work did not follow the order above: the spike was built as far as day 8, then parts of steps 2, 3, 5 and 6 were built ahead of the scientist sessions. Everything below runs only on a developer's machine.
+As of 23 November 2026. The work did not follow the order above: the spike was built as far as day 8, then parts of steps 2, 3, 5 and 6 were built ahead of the scientist sessions. Everything below runs on a developer's machine and, as a prototype, on a free Render service.
 
 | Step | Stands at | Built | Not built |
 |---|---|---|---|
@@ -296,7 +296,7 @@ As of 23 November 2026. The work did not follow the order above: the spike was b
 
 Not in the order of work, and built: looking for profiles by groups listed in `server/app/profile-sources.yaml`, with DDE and geochemistry groups that can be switched on; a user guide (`docs/user-guide.md`).
 
-Three things stand between here and the scientist sessions: drafts tied to the signed-in user, the dry run of day 9, and a web address with HTTPS.
+One thing stands between here and the scientist sessions: the dry run of day 9. Drafts are tied to the signed-in user, and the prototype runs at a web address with HTTPS (`docs/deploy-render.md`).
 
 ## To do: practices taken from CKAN
 
@@ -369,7 +369,7 @@ Where each day stands on 23 November 2026:
 |---|---|
 | 1 | Done. |
 | 2 | Done: `docs/form-inventory.md`. |
-| 3 | Built, but the "done when" is not met as written. Drafts save and reload, and ORCID sign-in works, yet a draft is not tied to the signed-in user: the browser remembers its id. There is no table of saved versions. |
+| 3 | Done, but for one part. A draft saved while signed in belongs to that person, who is listed their drafts in any browser; nobody else can open it. A draft started signed out has no owner until a signed-in save. There is no table of saved versions. |
 | 4–5 | Done. |
 | 6 | Done. |
 | 7 | Done. |
@@ -385,7 +385,7 @@ If the day 2 inventory shows the stock form is unusable in ways the planned cust
 
 - Done: an ORCID sandbox API client registered, for sign-in and author search. Sign-in worked against the sandbox on 19 November 2026.
 - Three scientists booked for day 10, none of whom has seen CDIF. Not recorded as done.
-- Not done: a web address with HTTPS for the test sessions, which ORCID sign-in requires outside a developer's own machine. The catalog runs only on a developer's machine, with development servers; nothing to deploy it elsewhere exists.
+- Done: a web address with HTTPS for the test sessions, which ORCID sign-in requires outside a developer's own machine. The prototype is deployed on a free Render service (`docs/deploy-render.md`), where sign-in with the ORCID sandbox worked on 23 November 2026.
 - Done: this repository, public, in the Cross-Domain-Interoperability-Framework organisation.
 
 ### Known traps

@@ -20,6 +20,8 @@ What works today:
 - **Start from a DOI:** fills the form from what DataCite or Crossref has registered.
 - **People and organisations:** authors and contributors are found in ORCID, organisations in ROR.
 - **Draft saving:** the record saves to the database as you type and is there when you come back.
+  A record saved while signed in belongs to that person: nobody else can open it, and they can
+  open it from any browser.
 - **Check and submit:** the server validates the record with the profile's JSON Schema and SHACL
   rules, lists what it found in plain words with a link to each field, and accepts a submission
   only when nothing is left that must be fixed. Every field has a plain-language label and a line
@@ -38,8 +40,7 @@ What works today:
 - **Sign-in with ORCID:** the catalog stores no passwords. Admins are named by ORCID iD in a
   setting, and only admins can use the harvest API.
 
-What does not exist yet: ownership of drafts (a draft is tied to the browser it was started in,
-and anyone who knows its address can read it, signed in or not), harvesters for anything but web
+What does not exist yet: harvesters for anything but web
 folders, converters for DCAT, SDMX and the formats with none (see `docs/design.md`), search, CSW, OGC API Records, the sitemap, and any
 review step after submission. A submitted record is not published: only harvested records appear
 in the feed. See [Intended scope](#intended-scope).
@@ -162,6 +163,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 |---|---|
 | `src/main.jsx` | Entry point. |
 | `src/App.jsx` | The page: loads the form files, saves the draft as you type, and connects the parts below. |
+| `src/Drafts.jsx` | The signed-in person's list of their own records, each with a button to open it. |
 | `src/DoiPrefill.jsx` | The "Start from a DOI" box. Fills only fields that are still empty. |
 | `src/fit.js` | Reshapes a catalog record into the document the form edits, so a copy of a published record can be opened in the form. Follows the form's own schema; simplifies what the form cannot show. |
 | `src/renderers.jsx` | Custom form controls: the author and contributor lists, and organisation names for publisher and funder. |
@@ -178,9 +180,10 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | Request | What it does |
 |---|---|
 | `GET /api/health` | Whether the server and the database are up. |
-| `POST /api/drafts` | Start a draft. Body: `{profile, document}`. |
-| `GET /api/drafts/{id}` | Read a draft. |
-| `PUT /api/drafts/{id}` | Replace a draft's document. A submitted record becomes a draft again. |
+| `GET /api/drafts` | The signed-in person's own drafts, newest first: `id`, `name`, `status`, `updated_at`. Empty when nobody is signed in. |
+| `POST /api/drafts` | Start a draft. Body: `{profile, document}`. It belongs to whoever is signed in; with nobody signed in it has no owner. |
+| `GET /api/drafts/{id}` | Read a draft. A draft with an owner answers 404 to anyone else, here and in the two rows below. |
+| `PUT /api/drafts/{id}` | Replace a draft's document. A submitted record becomes a draft again. A draft with no owner becomes the signed-in person's. |
 | `POST /api/drafts/{id}/submit` | Validate the stored draft and mark it submitted if nothing must be fixed. Returns the report either way. |
 | `POST /api/validate` | Validate a document without saving it. Body: `{profile, document, id?}`. Returns `valid`, `counts`, `findings` and the completed `record`. |
 | `GET /api/lookup/organisations?q=` | Organisations from ROR. |
