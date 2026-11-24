@@ -93,7 +93,8 @@ def test_only_keeps_the_addresses_that_hold_the_text_and_limit_stops_the_list():
     http, _ = site({SITE + "sitemap.xml": (urlset(*pages), "application/xml")})
     assert len(gather(http).items) == 6
     assert all("/dataset/" in i.identifier for i in gather(http, only="/dataset/").items)
-    assert len(gather(http, only="/dataset/", limit=2).items) == 2
+    cut = gather(http, only="/dataset/", limit=2)
+    assert len(cut.items) == 2 and cut.complete is False  # a list cut short withdraws nothing
 
 
 def test_an_address_that_is_not_a_sitemap_is_said_so_in_words():

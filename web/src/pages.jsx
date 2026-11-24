@@ -98,7 +98,7 @@ export function Home() {
         <Choice
           icon={<CloudDownloadOutlined />}
           title="Harvest records"
-          text="Gather records from a web folder of metadata files, or from a site's sitemap."
+          text="Gather records from a web folder of metadata files, a site's sitemap, or another catalogue."
           action="Harvest"
           href="#/harvest"
           disabled={!mayHarvest}
@@ -318,15 +318,15 @@ export function Harvest() {
   return (
     <Page title="Harvest records">
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        A source is a web folder (an address that answers with a page of links to metadata files) or a sitemap (the
-        file a site publishes to list its pages). The catalog fetches each file or page, converts what it finds,
-        checks it, and publishes it if it passes.
+        A source is a web folder (an address that answers with a page of links to metadata files), a sitemap (the
+        file a site publishes to list its pages) or another catalogue that offers the CSW search interface. The
+        catalog fetches each file, page or record, converts what it finds, checks it, and publishes it if it passes.
       </Typography>
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
         <Typography variant="subtitle1" component="h2">Add a source</Typography>
         <Stack component="form" onSubmit={add} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
           <TextField label="Name" required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} sx={{ flex: 1 }} />
-          <TextField label="Web address of the folder or sitemap" required type="url" value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} sx={{ flex: 2 }} />
+          <TextField label="Web address of the folder, sitemap or catalogue" required type="url" value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} sx={{ flex: 2 }} />
           {types.length > 1 && (
             <TextField label="Kind" select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} sx={{ minWidth: 140 }}>
               {types.map((t) => <MenuItem key={t.type} value={t.type}>{t.title}</MenuItem>)}

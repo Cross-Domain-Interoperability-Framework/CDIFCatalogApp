@@ -130,7 +130,8 @@ class SitemapHarvester(Harvester):
                     pages.setdefault(address, lastmod_date(lastmod))
 
         walk(source["url"], 0)
-        return Gathered(items=[Item(identifier=u, url=u, modified=m) for u, m in pages.items()], complete=True)
+        # Stopped by the limit, the list may not be everything: nothing is withdrawn on its word.
+        return Gathered(items=[Item(identifier=u, url=u, modified=m) for u, m in pages.items()], complete=len(pages) < config["limit"])
 
     def fetch(self, source: dict, item: Item, http) -> Fetched:
         response = http.get(item.url)
