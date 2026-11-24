@@ -181,7 +181,7 @@ If there is no "Sign in with ORCID" link, sign-in has not been set up on that co
 Harvesting is how most records get into the catalog. You point the catalog at a source, and it
 fetches each metadata file, turns it into CDIF and checks it.
 
-Today the catalog harvests four kinds of source. You must be signed in as an administrator.
+Today the catalog harvests five kinds of source. You must be signed in as an administrator.
 
 - A **web folder** is a web address that lists metadata files as links.
 - A **sitemap** is the file a site publishes to list its pages, usually at `/sitemap.xml`. Each
@@ -204,6 +204,12 @@ Today the catalog harvests four kinds of source. You must be signed in as an adm
   (`"datacite"` gives fuller records where it is offered), and `set` names one collection of the
   repository instead of all of it. The same 5,000 record `limit` applies. A record the
   repository marks as deleted is withdrawn here.
+- A **STAC catalogue** describes satellite imagery and other data laid out in space and time.
+  Give the address of a STAC service (such as `https://earth-search.aws.element84.com/v1`), of
+  its list of collections, or of a catalogue file (`catalog.json`). The catalog takes each
+  **collection** as one record. The single scenes or files inside a collection, which STAC
+  calls items, are not harvested. A collection rarely says when it last changed, so each is
+  fetched on every run and recognised as unchanged by its content.
 
 **The quick way** is the harvest page: sign in, then choose "Harvest records" on the catalog's
 first page. Give the source a name and the web address of the source, choose its kind, and
