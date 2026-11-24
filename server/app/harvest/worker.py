@@ -30,7 +30,13 @@ def tick(conn, http, timeout_minutes: int) -> bool:
     if job is None:
         return False
     log.info("running job %s", job["id"])
-    run.run_job(conn, job, http)
+    try:
+        run.run_job(conn, job, http)
+    except Exception as e:  # last resort: abort this job, keep the worker alive for the next
+        conn.rollback()
+        log.exception("job %s failed", job["id"])
+        run.abort(conn, job["id"], f"Stopped on an unexpected error: {type(e).__name__}: {e}")
+        return True
     log.info("job %s: %s", job["id"], run.stats(conn, job["id"]))
     return True
 
