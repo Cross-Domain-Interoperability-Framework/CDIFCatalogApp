@@ -186,6 +186,48 @@ def ddicdi_jsonld(content: str) -> dict:
     return _via_file(content, ".jsonld", lambda path: module.convert(path, detect=False))
 
 
+def _xml_root(content: str):
+    """The document's root element. No entity expansion and no network: the document comes from
+    a site we do not control."""
+    from lxml import etree
+
+    return etree.fromstring(content.encode("utf-8"), etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=False))
+
+
+def _only(found: list, kind: str):
+    if len(found) != 1:
+        raise HarvestError(f"The file holds {len(found)} {kind} records; one record per file is expected.")
+    return found[0]
+
+
+# These five know nothing of where the file came from. Each can be told (the record's own
+# address, the address of the service), and makes up an identifier when the document names none.
+def dublin_core(content: str) -> dict:
+    """Dublin Core as a CSW record or an OAI-PMH oai_dc record."""
+    module = _script("DublinCore/dc_to_cdif.py")
+    return _record(module.convert_dc_to_cdif(_only(module.records(_xml_root(content)), "Dublin Core"), detect=False))
+
+
+def eml(content: str) -> dict:
+    module = _script("EML/eml_to_cdif.py")
+    return _record(module.convert_eml_to_cdif(_only(module.documents(_xml_root(content)), "EML"), detect=False))
+
+
+def fgdc(content: str) -> dict:
+    module = _script("FGDC/fgdc_to_cdif.py")
+    return _record(module.convert_fgdc_to_cdif(_only(module.documents(_xml_root(content)), "FGDC"), detect=False))
+
+
+def ogc_capabilities(content: str) -> dict:
+    """What a WMS or WFS says about itself. The converter refuses the other OGC services."""
+    return _record(_script("OGCServices/ogc_services_to_cdif.py").convert_capabilities_to_cdif(_xml_root(content), detect=False))
+
+
+def stac(content: str) -> dict:
+    """A STAC Collection. The converter refuses an Item or a Catalog."""
+    return _record(_script("STAC/stac_to_cdif.py").convert_stac_to_cdif(json.loads(content), detect=False))
+
+
 # format id (from detect.py) -> the function that converts it
 CONNECTED = {
     "iso19139": iso,
@@ -202,4 +244,9 @@ CONNECTED = {
     "ddi-codebook-2.5": ddi_25,
     "ddicdi-xml": ddicdi_xml,
     "ddicdi-jsonld": ddicdi_jsonld,
+    "dublin-core": dublin_core,
+    "eml": eml,
+    "fgdc": fgdc,
+    "ogc-capabilities": ogc_capabilities,
+    "stac": stac,
 }

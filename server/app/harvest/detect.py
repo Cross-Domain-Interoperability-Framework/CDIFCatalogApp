@@ -34,7 +34,7 @@ FORMATS = {
     "fair2": ("FAIR2 JSON-LD", "FAIR2/fair2_to_cdif.py"),
     "niaid-json": ("NIAID Data Ecosystem JSON", "NIAID/harvest_niaid_to_cdif.py"),
     "dcat-us-json": ("DCAT-US data.json", None),
-    "stac": ("STAC JSON", None),
+    "stac": ("STAC JSON", "STAC/stac_to_cdif.py"),
     "datacite-json": ("DataCite JSON", None),
     "ckan-json": ("CKAN package JSON", None),
     "json-other": ("JSON of an unrecognised kind", None),
@@ -43,11 +43,11 @@ FORMATS = {
     "iso19115-2": ("ISO 19115-2 XML", "ISO19115/iso_to_cdif.py"),
     "iso19115-3": ("ISO 19115-3 XML", "ISO19115/iso_to_cdif.py"),
     "csw-response": ("CSW response XML", "ISO19115/iso_to_cdif.py"),
-    "fgdc": ("FGDC CSDGM XML", None),
+    "fgdc": ("FGDC CSDGM XML", "FGDC/fgdc_to_cdif.py"),
     "arcgis": ("ArcGIS metadata XML", None),
-    "eml": ("EML XML", None),
+    "eml": ("EML XML", "EML/eml_to_cdif.py"),
     "datacite-xml": ("DataCite XML", "DataCite/datacite_to_cdif.py"),
-    "dublin-core": ("Dublin Core XML", None),
+    "dublin-core": ("Dublin Core XML", "DublinCore/dc_to_cdif.py"),
     "ddi-1.2.2": ("DDI 1.2.2 XML", "DDI/ddi122_to_cdif.py"),
     "ddi-codebook-2.5": ("DDI Codebook 2.5 XML", "DDICodebook/ddi25_to_cdif.py"),
     "ddi-lifecycle": ("DDI Lifecycle XML", None),
@@ -56,7 +56,7 @@ FORMATS = {
     "dcat-rdfxml": ("DCAT RDF/XML", "DCAT/dcat_to_cdif.py"),
     "rdfxml-other": ("RDF/XML of an unrecognised kind", None),
     "oai-pmh-response": ("OAI-PMH response XML", None),
-    "ogc-capabilities": ("OGC service capabilities XML", None),
+    "ogc-capabilities": ("OGC service capabilities XML", "OGCServices/ogc_services_to_cdif.py"),
     "xml-other": ("XML of an unrecognised kind", None),
     "xml-invalid": ("text that starts like XML but is not well formed", None),
     "dcat-turtle": ("DCAT Turtle", "DCAT/dcat_to_cdif.py"),
@@ -207,7 +207,9 @@ def _plain_json(top: dict) -> Detected:
         return found("umm-c")
     if {"@type", "_id"} <= set(top) and "@context" not in top:  # an NIAID Data Ecosystem API record
         return found("niaid-json")
-    if "stac_version" in top:
+    # A Collection that leaves out its version is still a STAC Collection when it has the rest of
+    # what STAC requires of one; "license" is what an OGC API collection does not carry.
+    if "stac_version" in top or (top.get("type") == "Collection" and {"id", "extent", "links", "license"} <= set(top)):
         return found("stac")
     if isinstance(top.get("dataset"), list) and "project-open-data" in str(top.get("conformsTo", "")):
         return found("dcat-us-json")

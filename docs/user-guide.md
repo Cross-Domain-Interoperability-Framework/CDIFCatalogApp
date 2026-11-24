@@ -253,11 +253,16 @@ If some files failed for a passing reason, such as the source being briefly unre
 | NASA UMM-C | |
 | DDI 1.2.2, DDI Codebook 2.5 | Checking a large record can take up to 80 seconds. |
 | DDI-CDI, as XML or JSON-LD | |
+| Dublin Core | As a CSW record or an OAI-PMH record, one per file. |
+| EML | |
+| FGDC | |
+| STAC | Collections only. |
+| OGC service descriptions | WMS and WFS. Most are stored but not published yet: they break one rule of the profile the catalog checks against. |
 
 One record per file is expected. A file holding several is reported and not stored.
 
-Many more formats are **recognised but not converted**, among them FGDC, EML, Dublin Core, DCAT,
-STAC and CKAN. Such a file is kept as received and reported with its format's name, so nothing
+More formats are **recognised but not converted**, among them DCAT, SDMX, ArcGIS metadata and
+CKAN. Such a file is kept as received and reported with its format's name, so nothing
 is lost; it can be converted later, once a converter is connected.
 
 Converting does not guarantee passing. Several converters produce records that fail the check
