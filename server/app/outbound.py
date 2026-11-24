@@ -121,19 +121,26 @@ def _words(value) -> str:
 
 
 @router.get("/api/records")
-def list_records(q: str | None = None, page: int = 1, user: access.User = Depends(auth.current_user)) -> dict:
-    """Published records the requester may see, newest first, for the browse and search pages.
-    `q` keeps those whose title, description or keywords hold that text."""
+def list_records(
+    q: str | None = None, page: int = 1, sort: str | None = None, user: access.User = Depends(auth.current_user)
+) -> dict:
+    """Published records the requester may see, for the browse and search pages. `q` keeps those
+    holding those words. `sort` is `relevance` (the usual order when there are words), `modified`
+    (most recently changed first, the usual order when there are none) or `title`."""
     if page < 1:
         raise HTTPException(422, "page starts at 1.")
     q = (q or "").strip()
+    sort = sort or ("relevance" if q else "modified")
+    if sort not in store.ORDERS:
+        raise HTTPException(422, "sort must be one of: " + ", ".join(store.ORDERS))
     with store.connect() as conn:
         total, rows = store.visible_records(
-            conn, user, limit=LISTED_PER_PAGE, offset=(page - 1) * LISTED_PER_PAGE, containing=q or None
+            conn, user, limit=LISTED_PER_PAGE, offset=(page - 1) * LISTED_PER_PAGE, containing=q or None, order=sort
         )
     return {
         "total": total,
         "page": page,
+        "sort": sort,
         "pages": max(1, -(-total // LISTED_PER_PAGE)),
         "records": [
             {

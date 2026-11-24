@@ -107,7 +107,7 @@ export function Home() {
         <Choice
           icon={<Search />}
           title="Search catalog"
-          text="Find records by words in their title, description or keywords."
+          text="Find records by words, ranked, with the best match first."
           action="Search"
           href="#/search"
         />
@@ -120,13 +120,14 @@ export function Home() {
 
 export function Records({ searching }) {
   const [text, setText] = useState('');
-  const [query, setQuery] = useState({ q: '', page: 1 });
+  const [sort, setSort] = useState('relevance');
+  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance' });
   const [found, setFound] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let current = true;
-    const params = new URLSearchParams({ page: query.page, ...(query.q ? { q: query.q } : {}) });
+    const params = new URLSearchParams({ page: query.page, sort: query.sort, ...(query.q ? { q: query.q } : {}) });
     api('GET', `/api/records?${params}`)
       .then((answer) => current && (setFound(answer), setError(null)))
       .catch((e) => current && setError(e.message));
@@ -135,7 +136,12 @@ export function Records({ searching }) {
 
   const search = (e) => {
     e.preventDefault();
-    setQuery({ q: text.trim(), page: 1 });
+    setQuery({ q: text.trim(), page: 1, sort });
+  };
+
+  const reorder = (value) => {
+    setSort(value);
+    setQuery((prev) => ({ ...prev, sort: value, page: 1 }));
   };
 
   return (
@@ -148,6 +154,11 @@ export function Records({ searching }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
+        <TextField select label="Order" value={sort} onChange={(e) => reorder(e.target.value)} sx={{ minWidth: 190 }}>
+          <MenuItem value="relevance">Best match</MenuItem>
+          <MenuItem value="modified">Most recently changed</MenuItem>
+          <MenuItem value="title">Title</MenuItem>
+        </TextField>
         <Button type="submit" variant="contained">Search</Button>
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}

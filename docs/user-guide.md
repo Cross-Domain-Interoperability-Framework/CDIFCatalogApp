@@ -85,7 +85,10 @@ records, and search the catalog.
 
 **Browse records** lists the published records, newest first, 20 to a page. Each title opens
 that record's page. **Search catalog** is the same list with a box for words: it keeps the
-records whose title, description or keywords hold what you type.
+records whose title, keywords, creators, measured variables or description hold what you type,
+and shows the best match first. A word matches whatever its ending, so "ages" finds "age"; put
+"two words" in quotes to keep them together, and -word to leave a word out. The list can be
+ordered by best match, by what changed most recently, or by title.
 
 Programs reach records through the catalog feed and through each record's own address.
 
@@ -358,9 +361,11 @@ Setting up sign-in is described in [setup-sandboxes.md](setup-sandboxes.md).
 
 ## What is not built yet
 
-- **A full search.** "Search catalog" looks for your words in each record's title, description
-  and keywords. It does not rank results or offer filters.
-- **Other kinds of source**: CSW, OAI-PMH, CKAN, STAC.
+- **Filters and a map.** "Search catalog" ranks records by your words, but it does not yet
+  offer filters (by source, publisher, keyword or kind), a date range, or a map to search by
+  place.
+- **A CKAN source.** A CKAN portal that publishes a DCAT feed can be harvested as a DCAT
+  catalogue today; one without such a feed cannot yet.
 - **Publishing a submitted record**, and any review step before it.
 - **Full checking of the profiles beyond core and discovery.**
 - **Forms for the richer profiles.** The form covers core and discovery.
