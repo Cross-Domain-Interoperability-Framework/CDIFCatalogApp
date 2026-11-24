@@ -180,35 +180,85 @@ _WORDS = "websearch_to_tsquery('english', %s)"
 # How a list of records can be ordered. "relevance" needs words to rank by.
 ORDERS = ("relevance", "modified", "title")
 
+# The facets a search offers, each a key, and the SQL giving one record its value in that facet:
+# where it came from (the harvest source), who published it, and the detail level it reaches.
+_FACET_VALUE = {
+    "source": "r.source_id::text",
+    "publisher": "r.published->'schema:publisher'->>'schema:name'",
+    "profile": "r.profile",
+}
+FACETS = tuple(_FACET_VALUE)
+# The internal profile names, in the plain words the facet shows.
+PROFILE_LABELS = {"cdifCore": "Core", "CoreDiscovery": "Discovery"}
+
+
+def _search_where(user: access.User, containing, modified_since, filters, skip=None):
+    """The WHERE every search query shares: published, visible, matching the words, and narrowed
+    by each active facet filter (all but `skip`, so a facet's own counts are not narrowed by it)."""
+    where = "r.status = 'published' AND r.labels && %s"
+    params: list = [access.user_labels(user)]
+    if containing:
+        where += f" AND r.search @@ {_WORDS}"
+        params.append(containing)
+    if modified_since is not None:
+        where += " AND r.changed_at >= %s"
+        params.append(modified_since)
+    for name, value in (filters or {}).items():
+        if value and name != skip and name in _FACET_VALUE:
+            where += f" AND {_FACET_VALUE[name]} = %s"
+            params.append(value)
+    return where, params
+
 
 def visible_records(
-    conn, user: access.User, modified_since=None, limit: int = 100, offset: int = 0, containing=None, order="modified"
+    conn, user: access.User, modified_since=None, limit: int = 100, offset: int = 0,
+    containing=None, order="modified", filters=None,
 ):
     """(total, rows) of published records the user may see.
 
     `containing` keeps the records whose title, keywords, creators, variable names or description
     hold those words, in any letter case and whatever their endings ("ages" finds "age").
-    `order` is one of ORDERS: by relevance to the words (a match in the title counting most),
-    most recently changed first, or by title."""
-    where = "status = 'published' AND labels && %s"
-    params: list = [access.user_labels(user)]
-    if containing:
-        where += f" AND search @@ {_WORDS}"
-        params.append(containing)
-    if modified_since is not None:
-        where += " AND changed_at >= %s"
-        params.append(modified_since)
-    by, ranked = "changed_at DESC, id", []
+    `filters` is a {facet: value} map from FACETS that narrows the set further. `order` is one of
+    ORDERS: by relevance to the words (a match in the title counting most), most recently changed
+    first, or by title."""
+    where, params = _search_where(user, containing, modified_since, filters)
+    by, ranked = "r.changed_at DESC, r.id", []
     if order == "relevance" and containing:
-        by, ranked = f"ts_rank(search, {_WORDS}) DESC, changed_at DESC, id", [containing]
+        by, ranked = f"ts_rank(r.search, {_WORDS}) DESC, r.changed_at DESC, r.id", [containing]
     elif order == "title":
-        by = "lower(published->>'schema:name'), id"
-    total = conn.execute(f"SELECT count(*) AS n FROM records WHERE {where}", params).fetchone()["n"]
+        by = "lower(r.published->>'schema:name'), r.id"
+    total = conn.execute(f"SELECT count(*) AS n FROM records r WHERE {where}", params).fetchone()["n"]
     rows = conn.execute(
-        f"SELECT id, published, changed_at FROM records WHERE {where} ORDER BY {by} LIMIT %s OFFSET %s",
+        f"SELECT r.id, r.published, r.changed_at FROM records r WHERE {where} ORDER BY {by} LIMIT %s OFFSET %s",
         params + ranked + [limit, offset],
     ).fetchall()
     return total, rows
+
+
+def facet_counts(conn, user: access.User, containing=None, modified_since=None, filters=None, per_facet: int = 12):
+    """For each facet, the values present among the matching records, each with how many records
+    carry it, most first. A facet's own filter does not narrow its own counts, so the other
+    values in a chosen facet stay visible."""
+    out = {}
+    for name in FACETS:
+        where, params = _search_where(user, containing, modified_since, filters, skip=name)
+        value = _FACET_VALUE[name]
+        join = "JOIN harvest_sources s ON s.id = r.source_id" if name == "source" else ""
+        label = "s.title" if name == "source" else value
+        rows = conn.execute(
+            f"SELECT {value} AS value, {label} AS label, count(*) AS n FROM records r {join} "
+            f"WHERE {where} AND ({value}) IS NOT NULL GROUP BY {value}, {label} ORDER BY n DESC, label LIMIT %s",
+            params + [per_facet],
+        ).fetchall()
+        out[name] = [
+            {
+                "value": row["value"],
+                "label": PROFILE_LABELS.get(row["label"], row["label"]) if name == "profile" else row["label"],
+                "count": row["n"],
+            }
+            for row in rows
+        ]
+    return out
 
 
 def visible_record(conn, user: access.User, record_id):
