@@ -205,3 +205,30 @@ def test_search_ranks_title_matches_first_and_sorts_on_request(catalog):
     assert by_title["sort"] == "title"
     names = [r["name"] for r in by_title["records"]]
     assert names == sorted(names, key=str.lower)
+
+
+def test_search_offers_facets_and_filters_by_them(catalog):
+    mark = "ff" + uuid4().hex[:8]
+
+    def by(name):
+        return {"@type": ["schema:Organization"], "schema:name": f"{name} {mark}"}
+
+    alpha = catalog.add(MINIMAL, **{"schema:name": f"{mark} alpha", "schema:publisher": by("Acme")})
+    catalog.add(MINIMAL, **{"schema:name": f"{mark} beta", "schema:publisher": by("Beta")})
+    gamma = catalog.add(MINIMAL, **{"schema:name": f"{mark} gamma", "schema:publisher": by("Acme")})
+
+    everything = catalog.get("/api/records", params={"q": mark}).json()
+    assert everything["filters"] == {}
+    publishers = {f["label"]: f["count"] for f in everything["facets"]["publisher"]}
+    assert publishers[f"Acme {mark}"] == 2 and publishers[f"Beta {mark}"] == 1
+    assert everything["facets"]["profile"] == [{"value": "CoreDiscovery", "label": "Discovery", "count": 3}]
+
+    # choosing a publisher keeps only its records, and echoes the choice back
+    chosen = catalog.get("/api/records", params={"q": mark, "publisher": f"Acme {mark}"}).json()
+    assert chosen["total"] == 2 and {r["id"] for r in chosen["records"]} == {alpha, gamma}
+    assert chosen["filters"] == {"publisher": f"Acme {mark}"}
+    # a facet's own filter does not hide its other values, so the other publisher is still offered
+    assert f"Beta {mark}" in {f["label"] for f in chosen["facets"]["publisher"]}
+
+    # a value nothing carries simply finds nothing
+    assert catalog.get("/api/records", params={"q": mark, "publisher": "nobody at all"}).json()["total"] == 0

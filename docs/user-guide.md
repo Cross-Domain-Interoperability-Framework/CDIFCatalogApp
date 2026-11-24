@@ -88,7 +88,9 @@ that record's page. **Search catalog** is the same list with a box for words: it
 records whose title, keywords, creators, measured variables or description hold what you type,
 and shows the best match first. A word matches whatever its ending, so "ages" finds "age"; put
 "two words" in quotes to keep them together, and -word to leave a word out. The list can be
-ordered by best match, by what changed most recently, or by title.
+ordered by best match, by what changed most recently, or by title. Below the box, chips narrow
+the results by where a record came from, who published it, and how detailed it is; the number
+on each chip is how many records it would leave.
 
 Programs reach records through the catalog feed and through each record's own address.
 
@@ -361,9 +363,9 @@ Setting up sign-in is described in [setup-sandboxes.md](setup-sandboxes.md).
 
 ## What is not built yet
 
-- **Filters and a map.** "Search catalog" ranks records by your words, but it does not yet
-  offer filters (by source, publisher, keyword or kind), a date range, or a map to search by
-  place.
+- **A map and a date range.** "Search catalog" ranks records by your words and narrows them by
+  source, publisher and detail level, but it has no filter by keyword or kind, no date range,
+  and no map to search by place.
 - **A CKAN source.** A CKAN portal that publishes a DCAT feed can be harvested as a DCAT
   catalogue today; one without such a feed cannot yet.
 - **Publishing a submitted record**, and any review step before it.

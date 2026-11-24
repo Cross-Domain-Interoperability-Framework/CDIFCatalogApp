@@ -118,16 +118,20 @@ export function Home() {
 
 // ---- the list of records, and the search --------------------------------------------------------
 
+// The facets the search offers, in the plain words shown beside each row of choices.
+const FACET_LABELS = { source: 'Source', publisher: 'Published by', profile: 'Detail' };
+
 export function Records({ searching }) {
   const [text, setText] = useState('');
   const [sort, setSort] = useState('relevance');
-  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance' });
+  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance', source: '', publisher: '', profile: '' });
   const [found, setFound] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     let current = true;
     const params = new URLSearchParams({ page: query.page, sort: query.sort, ...(query.q ? { q: query.q } : {}) });
+    Object.keys(FACET_LABELS).forEach((k) => { if (query[k]) params.set(k, query[k]); });
     api('GET', `/api/records?${params}`)
       .then((answer) => current && (setFound(answer), setError(null)))
       .catch((e) => current && setError(e.message));
@@ -136,8 +140,11 @@ export function Records({ searching }) {
 
   const search = (e) => {
     e.preventDefault();
-    setQuery({ q: text.trim(), page: 1, sort });
+    setQuery((prev) => ({ ...prev, q: text.trim(), page: 1 }));
   };
+
+  const toggleFacet = (name, value) =>
+    setQuery((prev) => ({ ...prev, [name]: prev[name] === value ? '' : value, page: 1 }));
 
   const reorder = (value) => {
     setSort(value);
@@ -169,6 +176,29 @@ export function Records({ searching }) {
               ? (query.q ? `No record holds "${query.q}".` : 'The catalog holds no published records yet.')
               : `${found.total} ${found.total === 1 ? 'record' : 'records'}${query.q ? ` holding "${query.q}"` : ''}`}
           </Typography>
+          {found.facets && (
+            <Stack spacing={0.5} sx={{ mt: 1 }}>
+              {Object.entries(FACET_LABELS).map(([name, label]) => {
+                const values = found.facets[name] || [];
+                if (values.length < 2 && !query[name]) return null;
+                return (
+                  <Stack key={name} direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5, alignItems: 'baseline' }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ width: 96, flexShrink: 0 }}>{label}</Typography>
+                    {values.map((v) => (
+                      <Chip
+                        key={v.value}
+                        size="small"
+                        label={`${v.label} (${v.count})`}
+                        variant={query[name] === v.value ? 'filled' : 'outlined'}
+                        color={query[name] === v.value ? 'primary' : 'default'}
+                        onClick={() => toggleFacet(name, v.value)}
+                      />
+                    ))}
+                  </Stack>
+                );
+              })}
+            </Stack>
+          )}
           <Stack spacing={1} sx={{ my: 1 }}>
             {found.records.map((r) => (
               <Paper key={r.id} variant="outlined" sx={{ p: 1.5 }}>

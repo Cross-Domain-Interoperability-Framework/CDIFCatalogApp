@@ -146,6 +146,12 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   the `jsonb_path_query_array` expressions must stay valid for every published shape, or an
   insert fails. `visible_records(..., containing=, order=)` turns the words into a
   `websearch_to_tsquery` and ranks with `ts_rank`; `order` is one of `store.ORDERS`.
+- **Search facets are counted by `store.facet_counts`, each over the query minus its own
+  filter** (`_search_where(..., skip=name)`), so a chosen facet still shows its other values.
+  The facets are `store.FACETS` (source, publisher, profile); `_FACET_VALUE` holds the SQL for
+  each (publisher is read from the published JSON, so a record whose publisher is a list or
+  absent is not counted). `visible_records` and `facet_counts` share `_search_where`; the
+  record table is aliased `r` there and `harvest_sources` is joined only for the source facet.
 - **A CDIF record is validated against the profile its own catalog record declares**
   (`validate.profile_for`), not against a setting. The source's `profile` setting is only the
   fallback for a record that declares nothing we hold a profile for.
