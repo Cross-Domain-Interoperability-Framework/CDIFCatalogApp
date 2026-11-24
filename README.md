@@ -41,7 +41,7 @@ What works today:
   setting, and only admins can use the harvest API.
 
 What does not exist yet: harvesters for anything but web
-folders, sitemaps and CSW catalogues, converters for DCAT, SDMX and the formats with none (see `docs/design.md`), search, CSW, OGC API Records, a sitemap of the catalog's own records, and any
+folders, sitemaps, CSW catalogues and OAI-PMH repositories, converters for DCAT, SDMX and the formats with none (see `docs/design.md`), search, CSW, OGC API Records, a sitemap of the catalog's own records, and any
 review step after submission. A submitted record is not published: only harvested records appear
 in the feed. See [Intended scope](#intended-scope).
 
@@ -136,6 +136,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `converters/` | A git submodule: the CDIF [`converters`](https://github.com/Cross-Domain-Interoperability-Framework/converters) repository, pinned to a commit. Not edited here. |
 | `app/harvest/robots.py` | Obeys a site's `robots.txt`: what may be fetched, and the delay between requests. |
 | `app/harvest/csw.py` | The CSW harvester: asks a catalogue for the list of its records a page at a time, then for each record in full by its identifier, and takes the record out of the response's wrapper. |
+| `app/harvest/oai.py` | The OAI-PMH harvester: asks a repository for its record identifiers a batch at a time, then for each record by its identifier, and takes the record out of the response's wrapper. |
 | `app/harvest/sitemap.py` | The sitemap harvester: reads a sitemap (or an index of them, compressed or not) for each page's address and date, and takes the JSON-LD embedded in a page as its metadata. |
 | `app/harvest/waf.py` | The web folder harvester. It reads a listing page for its links and asks each file for its own modified date. |
 | `app/harvest/run.py` | Runs one job: compares the source with what is stored, records each record's outcome, and writes errors as rows. Also scheduling and time-outs. |

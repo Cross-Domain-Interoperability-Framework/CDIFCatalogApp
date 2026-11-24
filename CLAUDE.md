@@ -14,12 +14,12 @@ This file covers only the commands and the traps.
 
 An early prototype. Built: the `CoreDiscovery` submission form (draft saving, ORCID/ROR pickers,
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
-web folders, sitemaps and CSW catalogues with a worker; the DCAT catalog feed; record addresses with content negotiation; and
+web folders, sitemaps, CSW catalogues and OAI-PMH repositories with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
 the signed-in user; a landing page, a list of records with a plain word search, and a harvest
 page for admins (`web/src/pages.jsx`). The dry run (plan day 9) was done by script; its findings are in
 `docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
-the other harvesters (OAI-PMH, CKAN, STAC, DCAT, file upload), mappings into CDIF, publishing
+the other harvesters (CKAN, STAC, DCAT, file upload), mappings into CDIF, publishing
 of submitted records, search, serving CSW, OGC API Records and a sitemap of the catalog's own records. Do not start those without being asked.
 
 ## Commands
@@ -149,7 +149,13 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   identifier and `dct:modified`, then asks for each record with `GetRecordById` and hands on the
   record without its wrapper. It always asks for the whole list; it sends no date filter.
 - **A list cut short by a source's `limit` is not complete** (`Gathered.complete` is false), so
-  nothing is withdrawn on its word. This holds for the sitemap and CSW harvesters.
+  nothing is withdrawn on its word. This holds for the sitemap, CSW and OAI-PMH harvesters.
+- **The OAI-PMH harvester lists with `ListIdentifiers` and asks for each record with
+  `GetRecord`**, handing on what is inside `<metadata>`. A later batch is asked for by its
+  `resumptionToken` alone; the protocol refuses any other argument beside it. It always asks
+  for the whole list (no `from` date) and leaves out records marked deleted, so they are
+  withdrawn as missing. The `oai_datacite` prefix wraps the record a second time and is not
+  unwrapped; use `datacite` where a repository offers it.
 - **`robots.txt` is obeyed by wrapping the HTTP client (`robots.Polite`), so a harvester must use
   the client it is given** and not open its own. A closed address raises `Disallowed`; a
   harvester walking a source catches it and skips that address. Only a closed starting point

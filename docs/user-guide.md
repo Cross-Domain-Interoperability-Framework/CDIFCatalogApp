@@ -181,7 +181,7 @@ If there is no "Sign in with ORCID" link, sign-in has not been set up on that co
 Harvesting is how most records get into the catalog. You point the catalog at a source, and it
 fetches each metadata file, turns it into CDIF and checks it.
 
-Today the catalog harvests three kinds of source. You must be signed in as an administrator.
+Today the catalog harvests four kinds of source. You must be signed in as an administrator.
 
 - A **web folder** is a web address that lists metadata files as links.
 - A **sitemap** is the file a site publishes to list its pages, usually at `/sitemap.xml`. Each
@@ -196,9 +196,17 @@ Today the catalog harvests three kinds of source. You must be signed in as an ad
   otherwise; that setting can only be given through the address list described below
   (`"config": {"limit": 40000}`). While a list is cut short by the limit, no record is withdrawn
   for being missing from it.
+- An **OAI-PMH repository** is a repository that offers OAI-PMH, the interface Zenodo, Dataverse,
+  DSpace and DataCite use to hand their metadata to aggregators. Give the address of its
+  OAI-PMH service (for Zenodo, `https://zenodo.org/oai2d`). The catalog asks for the list of
+  record identifiers, then for each record, as Dublin Core. Two settings, given through the
+  address list described below, change that: `prefix` names another form the repository offers
+  (`"datacite"` gives fuller records where it is offered), and `set` names one collection of the
+  repository instead of all of it. The same 5,000 record `limit` applies. A record the
+  repository marks as deleted is withdrawn here.
 
 **The quick way** is the harvest page: sign in, then choose "Harvest records" on the catalog's
-first page. Give the source a name and the web address of the folder, sitemap or catalogue, choose its kind, and
+first page. Give the source a name and the web address of the source, choose its kind, and
 press "Add". Each
 source then has two buttons: "Harvest now" starts a run and shows its progress and its
 problems; "Retry failed" looks again at only the files that failed in the last run.
