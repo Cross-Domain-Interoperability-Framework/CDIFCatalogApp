@@ -138,6 +138,14 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   over the real examples in the `converters` repository (a checkout beside this one), which is
   how its rules were tuned. Recognising a format and converting it are separate:
   `converters.CONNECTED` holds what is connected.
+- **Ranked search reads a generated `search` column on `records`** (`store.SCHEMA`), a weighted
+  `tsvector` built from the published record: title (A), keywords and creators' names (B),
+  variable names (C), description (D). It is `GENERATED ALWAYS ... STORED`, so every save fills
+  it and no query code can forget it. To change what is searched, change the expression and run
+  `ALTER TABLE records DROP COLUMN search` once so the `ADD COLUMN IF NOT EXISTS` rebuilds it;
+  the `jsonb_path_query_array` expressions must stay valid for every published shape, or an
+  insert fails. `visible_records(..., containing=, order=)` turns the words into a
+  `websearch_to_tsquery` and ranks with `ts_rank`; `order` is one of `store.ORDERS`.
 - **A CDIF record is validated against the profile its own catalog record declares**
   (`validate.profile_for`), not against a setting. The source's `profile` setting is only the
   fallback for a record that declares nothing we hold a profile for.

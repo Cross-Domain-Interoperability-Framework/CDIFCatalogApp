@@ -77,6 +77,24 @@ CREATE TABLE IF NOT EXISTS records (
 CREATE INDEX IF NOT EXISTS records_labels ON records USING gin (labels);
 CREATE INDEX IF NOT EXISTS records_changed ON records (changed_at);
 
+-- What search looks through, kept by the database itself from the published record, so no code
+-- that saves a record can forget it. Title weighs most (A), then keywords and creators' names
+-- (B), variable names (C), and the description (D). To change what is searched, drop the column
+-- and let this add it again; it is rebuilt from the records.
+ALTER TABLE records ADD COLUMN IF NOT EXISTS search tsvector GENERATED ALWAYS AS (
+    setweight(to_tsvector('english', coalesce(published->>'schema:name', '')), 'A')
+    || setweight(jsonb_to_tsvector('english', jsonb_path_query_array(coalesce(published, '{}'),
+        '$."schema:keywords"[*] ? (@.type() == "string")'), '["string"]'), 'B')
+    || setweight(jsonb_to_tsvector('english', jsonb_path_query_array(coalesce(published, '{}'),
+        '$."schema:keywords".**."schema:name"'), '["string"]'), 'B')
+    || setweight(jsonb_to_tsvector('english', jsonb_path_query_array(coalesce(published, '{}'),
+        '$."schema:creator".**."schema:name"'), '["string"]'), 'B')
+    || setweight(jsonb_to_tsvector('english', jsonb_path_query_array(coalesce(published, '{}'),
+        '$."schema:variableMeasured".**."schema:name"'), '["string"]'), 'C')
+    || setweight(to_tsvector('english', coalesce(published->>'schema:description', '')), 'D')
+) STORED;
+CREATE INDEX IF NOT EXISTS records_search ON records USING gin (search);
+
 CREATE TABLE IF NOT EXISTS harvest_jobs (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     source_id        uuid NOT NULL REFERENCES harvest_sources(id) ON DELETE CASCADE,
@@ -156,29 +174,39 @@ def set_status(conn, record_id, status: str) -> None:
     )
 
 
-def visible_records(conn, user: access.User, modified_since=None, limit: int = 100, offset: int = 0, containing=None):
-    """(total, rows) of published records the user may see, most recently changed first.
+# The words a person typed, read the way a web search reads them: all of them wanted, "quoted
+# words" together, -word left out, or for either.
+_WORDS = "websearch_to_tsquery('english', %s)"
+# How a list of records can be ordered. "relevance" needs words to rank by.
+ORDERS = ("relevance", "modified", "title")
 
-    `containing` keeps the records whose title, description or keywords hold that text, in any
-    letter case. It is a plain look for the words, not the search the design describes."""
+
+def visible_records(
+    conn, user: access.User, modified_since=None, limit: int = 100, offset: int = 0, containing=None, order="modified"
+):
+    """(total, rows) of published records the user may see.
+
+    `containing` keeps the records whose title, keywords, creators, variable names or description
+    hold those words, in any letter case and whatever their endings ("ages" finds "age").
+    `order` is one of ORDERS: by relevance to the words (a match in the title counting most),
+    most recently changed first, or by title."""
     where = "status = 'published' AND labels && %s"
     params: list = [access.user_labels(user)]
     if containing:
-        # the words as written, not as a pattern: % and _ in them mean themselves
-        pattern = "%" + containing.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        where += (
-            " AND (published->>'schema:name' ILIKE %s OR published->>'schema:description' ILIKE %s"
-            " OR (published->'schema:keywords')::text ILIKE %s)"
-        )
-        params += [pattern] * 3
+        where += f" AND search @@ {_WORDS}"
+        params.append(containing)
     if modified_since is not None:
         where += " AND changed_at >= %s"
         params.append(modified_since)
+    by, ranked = "changed_at DESC, id", []
+    if order == "relevance" and containing:
+        by, ranked = f"ts_rank(search, {_WORDS}) DESC, changed_at DESC, id", [containing]
+    elif order == "title":
+        by = "lower(published->>'schema:name'), id"
     total = conn.execute(f"SELECT count(*) AS n FROM records WHERE {where}", params).fetchone()["n"]
     rows = conn.execute(
-        f"SELECT id, published, changed_at FROM records WHERE {where} "
-        "ORDER BY changed_at DESC, id LIMIT %s OFFSET %s",
-        params + [limit, offset],
+        f"SELECT id, published, changed_at FROM records WHERE {where} ORDER BY {by} LIMIT %s OFFSET %s",
+        params + ranked + [limit, offset],
     ).fetchall()
     return total, rows
 

@@ -165,22 +165,43 @@ def test_an_unpublished_or_unknown_record_is_not_found(catalog):
     assert catalog.get(f"/records/{uuid4()}").status_code == 404
 
 
-def test_the_list_for_the_web_pages_shows_published_records_and_finds_them_by_their_words(catalog):
-    mark = uuid4().hex  # a word no other record has
-    found = catalog.add(MINIMAL, **{"schema:name": f"Zircon ages {mark}", "schema:description": "U-Pb dates"})
-    by_keyword = catalog.add(MINIMAL, **{"schema:name": "Other", "schema:keywords": ["basalt", f"{mark} 100%_pure"]})
+def test_the_list_finds_published_records_by_words_in_any_of_their_fields(catalog):
+    mark = "zz" + uuid4().hex[:8]  # a word no other record has
+    found = catalog.add(MINIMAL, **{"schema:name": f"Zircon {mark} ages", "schema:description": "U-Pb dates"})
+    by_keyword = catalog.add(MINIMAL, **{"schema:name": "Other", "schema:keywords": ["basalt", mark]})
+    by_creator = catalog.add(MINIMAL, **{"schema:name": "Third", "schema:creator": [{"@type": "schema:Person", "schema:name": f"Dr {mark}"}]})
     hidden = catalog.add(MINIMAL, status="invalid", **{"schema:name": f"Hidden {mark}"})
 
     listed = catalog.get("/api/records", params={"q": mark.upper()}).json()
-    assert {r["id"] for r in listed["records"]} == {found, by_keyword} and listed["total"] == 2
+    assert {r["id"] for r in listed["records"]} == {found, by_keyword, by_creator} and listed["total"] == 3
     assert hidden not in {r["id"] for r in listed["records"]}
     first = next(r for r in listed["records"] if r["id"] == found)
-    assert first["name"] == f"Zircon ages {mark}" and first["description"] == "U-Pb dates"
+    assert first["name"] == f"Zircon {mark} ages" and first["description"] == "U-Pb dates"
 
-    # the words are looked for as written: a percent sign or underscore is not a wildcard
-    assert catalog.get("/api/records", params={"q": f"{mark} 100%_pure"}).json()["total"] == 1
-    assert catalog.get("/api/records", params={"q": f"{mark} 100%xpure"}).json()["total"] == 0
+    # words match by their stem, so a different ending still finds the record
+    assert found in {r["id"] for r in catalog.get("/api/records", params={"q": f"{mark} age"}).json()["records"]}
+    # every word must be present: {mark} and a word only one record has narrows to that record
+    assert catalog.get("/api/records", params={"q": f"{mark} basalt"}).json()["total"] == 1
 
     everything = catalog.get("/api/records").json()
-    assert everything["total"] >= 2 and len(everything["records"]) <= 20
+    assert everything["total"] >= 3 and len(everything["records"]) <= 20
     assert catalog.get("/api/records", params={"page": 0}).status_code == 422
+    assert catalog.get("/api/records", params={"sort": "sideways"}).status_code == 422
+
+
+def test_search_ranks_title_matches_first_and_sorts_on_request(catalog):
+    mark = "qq" + uuid4().hex[:8]
+    in_title = catalog.add(MINIMAL, **{"schema:name": f"{mark} survey"})
+    in_description = catalog.add(MINIMAL, **{"schema:name": "Aardvark study", "schema:description": f"mentions {mark} in passing"})
+
+    # relevance is the order when there are words, and a word in the title outranks one in the description
+    by_relevance = catalog.get("/api/records", params={"q": mark}).json()
+    assert by_relevance["sort"] == "relevance"
+    ranked = [r["id"] for r in by_relevance["records"]]
+    assert ranked.index(in_title) < ranked.index(in_description)
+
+    # sort=title orders by name instead, ignoring relevance
+    by_title = catalog.get("/api/records", params={"q": mark, "sort": "title"}).json()
+    assert by_title["sort"] == "title"
+    names = [r["name"] for r in by_title["records"]]
+    assert names == sorted(names, key=str.lower)
