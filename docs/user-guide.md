@@ -217,6 +217,14 @@ press "Add". Each
 source then has two buttons: "Harvest now" starts a run and shows its progress and its
 problems; "Retry failed" looks again at only the files that failed in the last run.
 
+**Files on your own computer** can be uploaded on the same page, under "Upload files". Give the
+batch a name, choose the files, and press "Upload". They go through the same steps as
+harvested files: the catalog works out what each one is, converts it, checks it and publishes
+it if it passes, and the batch then shows what happened to each file. A batch has an
+"Add files" button in place of "Harvest now": a file added under a name already in the batch
+replaces the earlier one. Up to 200 files can be sent at a time, each no larger than about
+5 MB. Files must be text (JSON, JSON-LD, XML or Turtle); a zip file is not unpacked.
+
 The steps below do the same through the catalog's interactive address list at
 **http://127.0.0.1:8000/docs**, which lets you fill in and send each request from the browser,
 and offers a few things the page does not (clearing a source, stopping a run). Sign in at

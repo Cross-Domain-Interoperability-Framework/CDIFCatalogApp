@@ -11,7 +11,7 @@ from psycopg.types.json import Jsonb
 from pydantic import BaseModel
 
 from app import access, auth
-from app.harvest import HarvestError, harvesters, run
+from app.harvest import HarvestError, harvesters, run, upload
 from app.store import connect
 
 router = APIRouter(prefix="/api/harvest", dependencies=[Depends(auth.require(access.HARVEST))])
@@ -28,7 +28,8 @@ class NewSource(BaseModel):
 
 @router.get("/types")
 def source_types() -> list:
-    return [{"type": h.type, "title": h.title} for h in harvesters().values()]
+    # the kinds that have an address to give; files are uploaded, not registered
+    return [{"type": h.type, "title": h.title} for h in harvesters().values() if h.type != "upload"]
 
 
 @router.post("/sources", status_code=201)
@@ -36,6 +37,8 @@ def create_source(body: NewSource) -> dict:
     harvester = harvesters().get(body.type)
     if harvester is None:
         raise HTTPException(422, f"Unknown source type: {body.type}")
+    if body.type == "upload":
+        raise HTTPException(422, "Uploaded files have no address to register. Send them to /api/harvest/uploads.")
     if body.frequency not in run.FREQUENCIES:
         raise HTTPException(422, "Frequency must be one of: " + ", ".join(run.FREQUENCIES))
     if not body.url.startswith(("http://", "https://")):
@@ -91,6 +94,52 @@ def start_job(source_id: UUID) -> dict:
         if open_job:
             raise HTTPException(409, f"This source already has a run in progress: {open_job['id']}")
         return conn.execute("INSERT INTO harvest_jobs (source_id) VALUES (%s) RETURNING *", (source_id,)).fetchone()
+
+
+class UploadedFile(BaseModel):
+    name: str
+    content: str
+
+
+class Upload(BaseModel):
+    files: list[UploadedFile]
+    title: str = ""  # for a new batch
+    source: UUID | None = None  # to add files to a batch uploaded before
+    organisation: str | None = None
+
+
+@router.post("/uploads", status_code=201)
+def upload_files(body: Upload) -> dict:
+    """Take a batch of metadata files and queue a run that converts, checks and stores them.
+    The files are sent as text. Without `source` a new batch is made, named by `title`."""
+    names = [f.name.strip() for f in body.files]
+    if not names or len(names) > upload.MAX_FILES:
+        raise HTTPException(422, f"Send between 1 and {upload.MAX_FILES} files at a time.")
+    if not all(names) or len(set(names)) != len(names):
+        raise HTTPException(422, "Each file needs a name, and no two may share one.")
+    too_long = [f.name for f in body.files if len(f.content) > upload.MAX_CHARACTERS]
+    if too_long:
+        raise HTTPException(422, f"Too large (over {upload.MAX_CHARACTERS:,} characters): {', '.join(too_long)}")
+    with connect() as conn:
+        if body.source is None:
+            if not body.title.strip():
+                raise HTTPException(422, "Give the batch a name.")
+            source = conn.execute(
+                "INSERT INTO harvest_sources (title, url, type, organisation) VALUES (%s, '', 'upload', %s) RETURNING *",
+                (body.title.strip(), body.organisation),
+            ).fetchone()
+        else:
+            source = _source(conn, body.source)
+            if source["type"] != "upload":
+                raise HTTPException(422, "That source is harvested from an address; files cannot be added to it.")
+            open_job = conn.execute(
+                "SELECT id FROM harvest_jobs WHERE source_id = %s AND status IN ('new', 'running')", (source["id"],)
+            ).fetchone()
+            if open_job:
+                raise HTTPException(409, f"This source already has a run in progress: {open_job['id']}")
+        upload.add_files(conn, source["id"], [(name, f.content) for name, f in zip(names, body.files)])
+        job = conn.execute("INSERT INTO harvest_jobs (source_id) VALUES (%s) RETURNING *", (source["id"],)).fetchone()
+    return {"source": source, "job": job}
 
 
 @router.post("/sources/{source_id}/clear")
