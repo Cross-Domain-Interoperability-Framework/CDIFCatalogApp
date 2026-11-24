@@ -106,6 +106,47 @@ def catalog(
     return Response(dcat.serialize(graph, fmt), media_type=dcat.MEDIA[fmt])
 
 
+# ---- the list the web pages show ---------------------------------------------------------------
+
+LISTED_PER_PAGE = 20
+
+
+def _words(value) -> str:
+    """A title or description as plain text, whichever of the shapes CDIF allows it came in."""
+    if isinstance(value, list):
+        value = value[0] if value else ""
+    if isinstance(value, dict):
+        value = value.get("@value") or value.get("schema:name") or ""
+    return str(value or "")
+
+
+@router.get("/api/records")
+def list_records(q: str | None = None, page: int = 1, user: access.User = Depends(auth.current_user)) -> dict:
+    """Published records the requester may see, newest first, for the browse and search pages.
+    `q` keeps those whose title, description or keywords hold that text."""
+    if page < 1:
+        raise HTTPException(422, "page starts at 1.")
+    q = (q or "").strip()
+    with store.connect() as conn:
+        total, rows = store.visible_records(
+            conn, user, limit=LISTED_PER_PAGE, offset=(page - 1) * LISTED_PER_PAGE, containing=q or None
+        )
+    return {
+        "total": total,
+        "page": page,
+        "pages": max(1, -(-total // LISTED_PER_PAGE)),
+        "records": [
+            {
+                "id": str(r["id"]),
+                "name": _words(r["published"].get("schema:name")) or "Untitled record",
+                "description": _words(r["published"].get("schema:description"))[:300],
+                "changed": r["changed_at"],
+            }
+            for r in rows
+        ],
+    }
+
+
 # ---- one record -------------------------------------------------------------------------------
 
 

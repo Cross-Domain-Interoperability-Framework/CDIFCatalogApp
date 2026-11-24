@@ -148,10 +148,21 @@ def set_status(conn, record_id, status: str) -> None:
     )
 
 
-def visible_records(conn, user: access.User, modified_since=None, limit: int = 100, offset: int = 0):
-    """(total, rows) of published records the user may see, most recently changed first."""
+def visible_records(conn, user: access.User, modified_since=None, limit: int = 100, offset: int = 0, containing=None):
+    """(total, rows) of published records the user may see, most recently changed first.
+
+    `containing` keeps the records whose title, description or keywords hold that text, in any
+    letter case. It is a plain look for the words, not the search the design describes."""
     where = "status = 'published' AND labels && %s"
     params: list = [access.user_labels(user)]
+    if containing:
+        # the words as written, not as a pattern: % and _ in them mean themselves
+        pattern = "%" + containing.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        where += (
+            " AND (published->>'schema:name' ILIKE %s OR published->>'schema:description' ILIKE %s"
+            " OR (published->'schema:keywords')::text ILIKE %s)"
+        )
+        params += [pattern] * 3
     if modified_since is not None:
         where += " AND changed_at >= %s"
         params.append(modified_since)
