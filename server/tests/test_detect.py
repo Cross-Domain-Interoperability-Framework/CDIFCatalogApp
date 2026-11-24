@@ -81,6 +81,9 @@ def test_plain_json_kinds():
     assert detect(json.dumps({"MetadataSpecification": {"URL": "https://cdn.earthdata.nasa.gov/umm/collection/v1.18"}})).format == "umm-c"
     assert detect(json.dumps({"hits": 1, "items": [{"meta": {}, "umm": {}}]})).format == "umm-c"
     assert detect(json.dumps({"stac_version": "1.0.0", "type": "Collection"})).format == "stac"
+    unversioned = {"type": "Collection", "id": "x", "extent": {}, "links": [], "license": "CC-BY-4.0"}
+    assert detect(json.dumps(unversioned)).format == "stac"
+    assert detect(json.dumps({k: v for k, v in unversioned.items() if k != "license"})).format == "json-other"
     assert detect(json.dumps({"data": {"attributes": {"doi": "10.1/x"}}})).format == "datacite-json"
     assert detect(json.dumps({"conformsTo": "https://project-open-data.cio.gov/v1.1/schema", "dataset": []})).format == "dcat-us-json"
     assert detect(json.dumps({"@type": "Dataset", "_id": "x", "name": "y"})).format == "niaid-json"
@@ -152,7 +155,7 @@ def test_cdif_passes_straight_through_and_everything_else_says_why_not():
     assert convert.to_cdif(detect(text), text) == json.loads(text)
     with pytest.raises(HarvestError, match="DCAT RDF/XML.*DCAT/dcat_to_cdif.py.*not connected"):
         convert.to_cdif(detect(XML["dcat-rdfxml"]), XML["dcat-rdfxml"])
-    with pytest.raises(HarvestError, match="FGDC CSDGM XML.*no converter"):
-        convert.to_cdif(detect(XML["fgdc"]), XML["fgdc"])
+    with pytest.raises(HarvestError, match="ArcGIS metadata XML.*no converter"):
+        convert.to_cdif(detect(XML["arcgis"]), XML["arcgis"])
     with pytest.raises(HarvestError, match="not valid JSON"):
         convert.to_cdif(detect("{not json"), "{not json")

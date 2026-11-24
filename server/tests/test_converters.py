@@ -87,6 +87,11 @@ def test_a_file_of_several_datacite_records_is_refused_in_words():
     ("ROCrate", "*.json", "rocrate"),
     ("UMM/examples", "*.json", "umm-c"),
     ("DDI-CDI/Examples", "*.json", "ddicdi-jsonld"),
+    ("DublinCore/examples", "*.xml", "dublin-core"),
+    ("EML/examples", "*.xml", "eml"),
+    ("FGDC/examples", "*.xml", "fgdc"),
+    ("OGCServices/examples", "*.xml", "ogc-capabilities"),
+    ("STAC/examples", "*.json", "stac"),
 ])
 def test_the_other_connected_converters_run_and_return_one_record(folder, pattern, fmt):
     # These produce records that do not all pass the pinned CoreDiscovery profile yet; that is
