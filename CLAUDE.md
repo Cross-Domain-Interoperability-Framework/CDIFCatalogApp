@@ -14,12 +14,12 @@ This file covers only the commands and the traps.
 
 An early prototype. Built: the `CoreDiscovery` submission form (draft saving, ORCID/ROR pickers,
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
-web folders, sitemaps, CSW catalogues, OAI-PMH repositories and STAC catalogues, and from uploaded files, with a worker; the DCAT catalog feed; record addresses with content negotiation; and
+web folders, sitemaps, CSW catalogues, OAI-PMH repositories, STAC catalogues and DCAT catalogues, and from uploaded files, with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
 the signed-in user; a landing page, a list of records with a plain word search, and a harvest
 page for admins (`web/src/pages.jsx`). The dry run (plan day 9) was done by script; its findings are in
 `docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
-the other harvesters (CKAN, DCAT), API tokens, mappings into CDIF, publishing
+a CKAN harvester, API tokens, mappings into CDIF, publishing
 of submitted records, search, serving CSW, OGC API Records and a sitemap of the catalog's own records. Do not start those without being asked.
 
 ## Commands
@@ -166,10 +166,24 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   from the database with a connection of its own, the one harvester that does not use the HTTP
   client. The files are sent as text in JSON, so no multipart library is needed. The type is
   left out of `/api/harvest/types` and refused by `POST /api/harvest/sources`.
-- **CKAN and DCAT harvesters wait on converters.** A CKAN package is recognised but has no
-  converter at the pinned commit (the `converters` repository gained one later, which wants
-  the portal's host as well as the package), and the DCAT converter is not connected (its entry point takes one dataset picked
-  out of a graph). A harvester for either would store nothing useful until that changes.
+- **The DCAT harvester splits a catalogue; the DCAT converter takes one dataset.** `dcat.cut`
+  takes a dataset out of the catalogue's graph with what hangs from it, stopping at other
+  datasets and the catalogue itself, and writes it as expanded JSON-LD with canonical labels
+  for nodes that have no address, in sorted order. Without that the text would differ on every
+  read and every run would report every record as updated. The converter's rules match
+  prefixed names, so `converters._dcat` reads a document as a graph and writes it again in the
+  converter's own prefixes (`load_context()`) before converting. A file holding several
+  datasets is refused by the converter with advice to harvest it as a catalogue.
+- **A JSON-LD context named by address is fetched by the DCAT harvester, not by rdflib**
+  (`dcat._inline_contexts`), so the fetch goes through the polite client. The converter refuses
+  such a document outright, since reading it there would fetch from the web unasked.
+- **A dataset with no address of its own gets one** (`dcat.address`): the catalogue page's
+  address, `#`, and its stated identifier. A `data.json` dataset has only a short identifier,
+  and a record with no address fails the profile.
+- **A CKAN harvester is not built.** The `converters` repository has a CKAN converter since the
+  pin moved to `58fd83c`; it is not connected, and it wants the portal's host as well as the
+  package, which converters here are not given. A CKAN portal that offers `/catalog.ttl` can be
+  harvested today as a DCAT catalogue.
 - **`robots.txt` is obeyed by wrapping the HTTP client (`robots.Polite`), so a harvester must use
   the client it is given** and not open its own. A closed address raises `Disallowed`; a
   harvester walking a source catches it and skips that address. Only a closed starting point
