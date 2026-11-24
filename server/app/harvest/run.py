@@ -4,6 +4,8 @@ Every record a run touches gets a row in `harvest_objects` ending in one outcome
 not modified, deleted or errored. Every failure is a row in `harvest_errors` naming its stage.
 Work is committed record by record, so a run can be watched, and aborted between records.
 """
+import json
+
 from psycopg.types.json import Jsonb
 
 from app import access, store, validate
@@ -14,6 +16,18 @@ from app.harvest.robots import Polite
 DEFAULT_PROFILE = "CoreDiscovery"
 # Sent with every request, and the name a site's robots.txt rules are matched against.
 USER_AGENT = "CDIFCatalogApp-harvester"
+
+
+def _json_storable(record: dict) -> None:
+    """`jsonb` cannot hold NaN or infinity, which a converter can still produce (a missing
+    numeric bound comes out as NaN). Such a record cannot be stored; say so plainly here
+    rather than letting the INSERT fail and take the worker down."""
+    try:
+        json.dumps(record, allow_nan=False)
+    except ValueError:
+        raise HarvestError(
+            "The record holds a value that is not a finite number (NaN or infinity), which cannot be stored."
+        )
 
 # How often a scheduled source runs. MANUAL sources run only when asked.
 FREQUENCIES = {"MANUAL": None, "DAILY": "1 day", "WEEKLY": "7 days", "BIWEEKLY": "14 days", "MONTHLY": "1 month"}
@@ -117,8 +131,14 @@ def run_job(conn, job: dict, http) -> None:
         status = conn.execute("SELECT status FROM harvest_jobs WHERE id = %s", (job_id,)).fetchone()["status"]
         if status != "running":  # aborted while running
             return
-        _harvest_one(conn, harvester, source, obj, http, force=retrying)
-        conn.commit()
+        try:
+            _harvest_one(conn, harvester, source, obj, http, force=retrying)
+            conn.commit()
+        except Exception as e:  # a single record must never stop the run or kill the worker
+            conn.rollback()
+            _error(conn, job_id, obj["id"], "import", e)
+            _close(conn, obj, "errored")
+            conn.commit()
 
     # ---- withdraw what the source no longer lists ----
     # Only after a run in which every listed record could be fetched. If the source was
@@ -221,6 +241,7 @@ def _harvest_one(conn, harvester, source: dict, obj: dict, http, force: bool = F
         if detected.format != "cdif-jsonld":
             # The catalog made this record, so the catalog says what it conforms to.
             cdif, profile = convert.claim(cdif, profile)
+        _json_storable(cdif)  # a record that is not valid JSON is kept, not stored, and reported
         conflicts = store.overlay_conflicts(known["source_cdif"] if known else None, cdif, overlay)
         if conflicts:
             # Changed at the source in a property a data manager has overridden: keep what is
@@ -240,9 +261,11 @@ def _harvest_one(conn, harvester, source: dict, obj: dict, http, force: bool = F
                     "It is stored but not published."
                 )
     except Exception as e:
-        # Not mappable or not checkable. The text as received is still kept, so the record can
-        # be mapped again later without another harvest.
+        # Not mappable, not checkable, or not storable. The text as received is still kept, so
+        # the record can be mapped again later; what we could not make is dropped, so nothing
+        # half-built (a NaN among it) reaches the database.
         status, problem = "invalid", e
+        cdif = published = report = None
 
     labels = access.record_labels(status, source["organisation"])
     values = (

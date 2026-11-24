@@ -193,6 +193,33 @@ def test_a_format_whose_converter_is_not_connected_is_recognised_kept_and_report
     assert kept["received"] == SDMX and kept["received_format"] == "sdmx-ml" and kept["status"] == "invalid"
 
 
+def test_a_record_that_cannot_be_stored_is_kept_as_invalid_and_does_not_crash_the_run(db, monkeypatch):
+    from app.harvest import convert
+
+    real = convert.to_cdif
+
+    def maybe_nan(detected, content):
+        record = real(detected, content)
+        if "BADREC" in content:  # a converter can produce a NaN for a missing numeric bound
+            return {**record, "schema:variableMeasured": [{"schema:name": "v", "schema:minValue": float("nan")}]}
+        return record
+
+    monkeypatch.setattr(convert, "to_cdif", maybe_nan)
+    good = json.dumps({**json.loads(MINIMAL), "schema:name": "A good record"})
+    bad = json.dumps({**json.loads(MINIMAL), "schema:name": "BADREC and its NaN"})
+
+    source = new_source(db)
+    job = harvest(db, source, Folder({"good.json": ("30-Mar-2024 12:01", good), "bad.json": ("30-Mar-2024 12:01", bad)}))
+
+    assert job["status"] == "finished"  # the bad record did not take the run (or the worker) down
+    assert job["stats"]["added"] == 1 and job["stats"]["errored"] == 1
+    kept = records(db, source)
+    assert kept["good.json"]["status"] == "published"
+    assert kept["bad.json"]["status"] == "invalid" and kept["bad.json"]["received"] == bad
+    assert kept["bad.json"]["source_cdif"] is None and kept["bad.json"]["published"] is None
+    assert "not a finite number" in next(e["message"] for e in job["errors"])
+
+
 def test_an_iso_record_is_converted_checked_and_published_with_the_catalogs_own_claim(db):
     examples = sorted((CONVERTERS / "ISO19115" / "examples").rglob("*.xml"))
     assert examples, "server/converters is empty: run `git submodule update --init`"

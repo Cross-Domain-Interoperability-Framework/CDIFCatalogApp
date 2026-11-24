@@ -202,6 +202,15 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   the client it is given** and not open its own. A closed address raises `Disallowed`; a
   harvester walking a source catches it and skips that address. Only a closed starting point
   should fail the run.
+- **`jsonb` cannot hold `NaN` or infinity, and a converter can still produce them** (a missing
+  numeric bound came out of the ISO converter as `schema:minValue: NaN`, which took the worker
+  down once). `run._json_storable` catches such a record inside `_harvest_one`'s try, so it is
+  kept as `invalid` with its received text and a plain message instead of failing at the INSERT.
+  Belt and braces: `run_job` records any single record's failure as that record's error and
+  carries on, and the worker's `tick` aborts a job on any unexpected error rather than dying, so
+  one bad record can never crash the worker. A `NaN` in converter output is also a `converters`
+  issue. The worker service has no restart policy, so a crash leaves it `Exited` and jobs stuck
+  `running` until `abort_stale` clears them (24 h by default).
 - **Records missing from a source are withdrawn at the end of a run, and only if no fetch
   failed in it.** A retry run never withdraws and never counts as the last clean run.
 - **Git Bash rewrites `/srv/...` arguments into Windows paths.** Prefix a `docker compose exec`
