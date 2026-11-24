@@ -65,6 +65,7 @@ def harvesters() -> dict:
     from app.harvest.oai import OaiHarvester
     from app.harvest.sitemap import SitemapHarvester
     from app.harvest.stac import StacHarvester
+    from app.harvest.upload import UploadHarvester
     from app.harvest.waf import WafHarvester
 
-    return {h.type: h for h in (WafHarvester(), SitemapHarvester(), CswHarvester(), OaiHarvester(), StacHarvester())}
+    return {h.type: h for h in (WafHarvester(), SitemapHarvester(), CswHarvester(), OaiHarvester(), StacHarvester(), UploadHarvester())}

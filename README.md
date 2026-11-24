@@ -139,6 +139,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `app/harvest/oai.py` | The OAI-PMH harvester: asks a repository for its record identifiers a batch at a time, then for each record by its identifier, and takes the record out of the response's wrapper. |
 | `app/harvest/sitemap.py` | The sitemap harvester: reads a sitemap (or an index of them, compressed or not) for each page's address and date, and takes the JSON-LD embedded in a page as its metadata. |
 | `app/harvest/stac.py` | The STAC harvester: takes each collection of a STAC service, of a list of collections, or of a catalogue file followed through its child links. Items are not harvested. |
+| `app/harvest/upload.py` | Uploaded files: kept in the `uploads` table and read from there by a run, so they are converted, checked and stored like harvested ones. |
 | `app/harvest/waf.py` | The web folder harvester. It reads a listing page for its links and asks each file for its own modified date. |
 | `app/harvest/run.py` | Runs one job: compares the source with what is stored, records each record's outcome, and writes errors as rows. Also scheduling and time-outs. |
 | `app/harvest/worker.py` | The worker loop: `python -m app.harvest.worker`. |
@@ -209,6 +210,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `POST /api/auth/logout` | Sign out. |
 | `POST /api/harvest/sources` | Everything under `/api/harvest` needs a signed-in admin. Register a harvest source. Body: `{title, url, type, config?, organisation?, frequency?}`. `type` is `waf`; `config` may set `extensions`, `depth`, `profile` and `ignore_robots`; `frequency` is `MANUAL`, `DAILY`, `WEEKLY`, `BIWEEKLY` or `MONTHLY`. |
 | `GET /api/harvest/sources`, `GET /api/harvest/sources/{id}` | The sources; one source with its last runs and its record counts. |
+| `POST /api/harvest/uploads` | Take a batch of metadata files, as text, and queue a run over them. Body: `{files: [{name, content}], title?, source?, organisation?}`. `title` names a new batch; `source` adds the files to an earlier one, replacing by name. |
 | `POST /api/harvest/sources/{id}/jobs` | Queue a run. Refused while one is in progress. |
 | `POST /api/harvest/sources/{id}/clear` | Remove a source's records and runs, keeping the source. |
 | `GET /api/harvest/jobs/{id}` | A run: its state, counts by outcome, and its errors by stage. |

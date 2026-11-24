@@ -14,12 +14,12 @@ This file covers only the commands and the traps.
 
 An early prototype. Built: the `CoreDiscovery` submission form (draft saving, ORCID/ROR pickers,
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
-web folders, sitemaps, CSW catalogues, OAI-PMH repositories and STAC catalogues with a worker; the DCAT catalog feed; record addresses with content negotiation; and
+web folders, sitemaps, CSW catalogues, OAI-PMH repositories and STAC catalogues, and from uploaded files, with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
 the signed-in user; a landing page, a list of records with a plain word search, and a harvest
 page for admins (`web/src/pages.jsx`). The dry run (plan day 9) was done by script; its findings are in
 `docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
-the other harvesters (CKAN, DCAT, file upload), mappings into CDIF, publishing
+the other harvesters (CKAN, DCAT), API tokens, mappings into CDIF, publishing
 of submitted records, search, serving CSW, OGC API Records and a sitemap of the catalog's own records. Do not start those without being asked.
 
 ## Commands
@@ -161,8 +161,14 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   answers: a `data` link or a `collections` list is read page by page; otherwise `child` links
   are followed. A collection in a catalogue file is fetched twice, once to find out that it is
   one and once to harvest it.
+- **Uploaded files are a source of type `upload` with no address.** `POST /api/harvest/uploads`
+  keeps the files in the `uploads` table and queues a run; `upload.UploadHarvester` reads them
+  from the database with a connection of its own, the one harvester that does not use the HTTP
+  client. The files are sent as text in JSON, so no multipart library is needed. The type is
+  left out of `/api/harvest/types` and refused by `POST /api/harvest/sources`.
 - **CKAN and DCAT harvesters wait on converters.** A CKAN package is recognised but has no
-  converter, and the DCAT converter is not connected (its entry point takes one dataset picked
+  converter at the pinned commit (the `converters` repository gained one later, which wants
+  the portal's host as well as the package), and the DCAT converter is not connected (its entry point takes one dataset picked
   out of a graph). A harvester for either would store nothing useful until that changes.
 - **`robots.txt` is obeyed by wrapping the HTTP client (`robots.Polite`), so a harvester must use
   the client it is given** and not open its own. A closed address raises `Disallowed`; a

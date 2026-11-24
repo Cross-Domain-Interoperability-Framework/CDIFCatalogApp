@@ -44,6 +44,14 @@ CREATE TABLE IF NOT EXISTS harvest_sources (
     created_at    timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS uploads (
+    source_id    uuid NOT NULL REFERENCES harvest_sources(id) ON DELETE CASCADE,
+    name         text NOT NULL,
+    content      text NOT NULL,
+    uploaded_at  timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (source_id, name)
+);
+
 CREATE TABLE IF NOT EXISTS records (
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     profile            text NOT NULL,

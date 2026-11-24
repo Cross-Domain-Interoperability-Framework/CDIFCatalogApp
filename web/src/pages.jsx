@@ -237,6 +237,9 @@ function Run({ jobId, onDone }) {
   );
 }
 
+// The files a person picked, read as text: metadata files are text, and the server takes them so.
+const asText = (files) => Promise.all([...files].map(async (f) => ({ name: f.name, content: await f.text() })));
+
 function Source({ id }) {
   const [source, setSource] = useState(null);
   const [error, setError] = useState(null);
@@ -247,12 +250,24 @@ function Source({ id }) {
   const latest = source.jobs[0];
   const act = (path) => api('POST', path).then(load).catch((e) => setError(e.message));
   const busy = latest && RUNNING.includes(latest.status);
+  const uploaded = source.type === 'upload';
+  const addFiles = (e) => {
+    const picked = e.target.files;
+    if (!picked.length) return;
+    asText(picked)
+      .then((files) => api('POST', '/api/harvest/uploads', { source: id, files }))
+      .then(() => { setError(null); load(); })
+      .catch((err) => setError(err.message));
+    e.target.value = '';
+  };
   return (
     <Paper variant="outlined" sx={{ p: 1.5 }} data-testid="source">
       <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ fontWeight: 600 }}>{source.title}</Typography>
-          <Link href={source.url} target="_blank" rel="noreferrer" variant="body2" sx={{ wordBreak: 'break-all' }}>{source.url}</Link>
+          {uploaded
+            ? <Typography variant="body2" color="text.secondary">Uploaded files</Typography>
+            : <Link href={source.url} target="_blank" rel="noreferrer" variant="body2" sx={{ wordBreak: 'break-all' }}>{source.url}</Link>}
           <Stack direction="row" spacing={0.5} sx={{ mt: 0.5, flexWrap: 'wrap', rowGap: 0.5 }}>
             {Object.entries(source.records).map(([status, n]) => (
               <Chip key={status} size="small" variant="outlined" label={`${n} ${status}`} />
@@ -266,7 +281,14 @@ function Source({ id }) {
               Retry failed
             </Button>
           )}
-          <Button variant="outlined" disabled={busy} onClick={() => act(`/api/harvest/sources/${id}/jobs`)}>Harvest now</Button>
+          {uploaded ? (
+            <Button variant="outlined" component="label" disabled={busy} title="Add files to this batch, or replace ones already in it by name">
+              Add files
+              <input type="file" multiple hidden onChange={addFiles} />
+            </Button>
+          ) : (
+            <Button variant="outlined" disabled={busy} onClick={() => act(`/api/harvest/sources/${id}/jobs`)}>Harvest now</Button>
+          )}
         </Stack>
       </Stack>
       {error && <Alert severity="error" sx={{ mt: 1 }} onClose={() => setError(null)}>{error}</Alert>}
@@ -281,6 +303,8 @@ export function Harvest() {
   const [types, setTypes] = useState([]);
   const [draft, setDraft] = useState({ title: '', url: '', type: '', only: '' });
   const [error, setError] = useState(null);
+  const [batch, setBatch] = useState('');
+  const picker = useRef(null);
   const allowed = !!me?.permissions?.includes('harvest');
 
   const load = () => api('GET', '/api/harvest/sources').then(setSources).catch((e) => setError(e.message));
@@ -303,6 +327,14 @@ export function Harvest() {
       .catch((err) => setError(err.message));
   };
 
+  const upload = (e) => {
+    e.preventDefault();
+    asText(picker.current.files)
+      .then((files) => api('POST', '/api/harvest/uploads', { title: batch.trim(), files }))
+      .then(() => { setBatch(''); picker.current.value = ''; setError(null); load(); })
+      .catch((err) => setError(err.message));
+  };
+
   if (!me) return <Page title="Harvest records" />;
   if (!allowed) {
     return (
@@ -322,6 +354,7 @@ export function Harvest() {
         file a site publishes to list its pages), another catalogue that offers the CSW search interface, a
         repository that offers OAI-PMH, or a STAC catalogue. The
         catalog fetches each file, page or record, converts what it finds, checks it, and publishes it if it passes.
+        Metadata files on your own computer can be uploaded instead, and go through the same steps.
       </Typography>
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
         <Typography variant="subtitle1" component="h2">Add a source</Typography>
@@ -343,6 +376,16 @@ export function Harvest() {
             />
           )}
           <Button type="submit" variant="contained" sx={{ mt: { sm: '6px !important' } }}>Add</Button>
+        </Stack>
+      </Paper>
+      <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
+        <Typography variant="subtitle1" component="h2">Upload files</Typography>
+        <Stack component="form" onSubmit={upload} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
+          <TextField label="Name for this batch" required value={batch} onChange={(e) => setBatch(e.target.value)} sx={{ flex: 1 }} />
+          <Box sx={{ flex: 2 }}>
+            <input ref={picker} type="file" multiple required aria-label="Metadata files" />
+          </Box>
+          <Button type="submit" variant="contained">Upload</Button>
         </Stack>
       </Paper>
       {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
