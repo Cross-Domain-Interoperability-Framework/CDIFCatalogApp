@@ -319,8 +319,8 @@ export function Harvest() {
     <Page title="Harvest records">
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         A source is a web folder (an address that answers with a page of links to metadata files), a sitemap (the
-        file a site publishes to list its pages), another catalogue that offers the CSW search interface, or a
-        repository that offers OAI-PMH. The
+        file a site publishes to list its pages), another catalogue that offers the CSW search interface, a
+        repository that offers OAI-PMH, or a STAC catalogue. The
         catalog fetches each file, page or record, converts what it finds, checks it, and publishes it if it passes.
       </Typography>
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
