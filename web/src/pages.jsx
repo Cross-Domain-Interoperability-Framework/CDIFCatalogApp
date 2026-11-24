@@ -98,7 +98,7 @@ export function Home() {
         <Choice
           icon={<CloudDownloadOutlined />}
           title="Harvest records"
-          text="Gather records from a folder of metadata files on the web."
+          text="Gather records from a web folder of metadata files, or from a site's sitemap."
           action="Harvest"
           href="#/harvest"
           disabled={!mayHarvest}
@@ -279,7 +279,7 @@ export function Harvest() {
   const me = useMe();
   const [sources, setSources] = useState(null);
   const [types, setTypes] = useState([]);
-  const [draft, setDraft] = useState({ title: '', url: '', type: '' });
+  const [draft, setDraft] = useState({ title: '', url: '', type: '', only: '' });
   const [error, setError] = useState(null);
   const allowed = !!me?.permissions?.includes('harvest');
 
@@ -295,8 +295,11 @@ export function Harvest() {
 
   const add = (e) => {
     e.preventDefault();
-    api('POST', '/api/harvest/sources', { ...draft, title: draft.title.trim(), url: draft.url.trim() })
-      .then(() => { setDraft({ ...draft, title: '', url: '' }); setError(null); load(); })
+    const source = { title: draft.title.trim(), url: draft.url.trim(), type: draft.type };
+    // A sitemap lists every page of a site; this keeps the ones that describe datasets.
+    if (draft.type === 'sitemap' && draft.only.trim()) source.config = { only: draft.only.trim() };
+    api('POST', '/api/harvest/sources', source)
+      .then(() => { setDraft({ ...draft, title: '', url: '', only: '' }); setError(null); load(); })
       .catch((err) => setError(err.message));
   };
 
@@ -315,18 +318,28 @@ export function Harvest() {
   return (
     <Page title="Harvest records">
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        A source is a web folder: an address that answers with a page of links to metadata files. The catalog fetches
-        each file, converts it, checks it, and publishes it if it passes.
+        A source is a web folder (an address that answers with a page of links to metadata files) or a sitemap (the
+        file a site publishes to list its pages). The catalog fetches each file or page, converts what it finds,
+        checks it, and publishes it if it passes.
       </Typography>
       <Paper variant="outlined" sx={{ p: 1.5, mb: 2 }}>
         <Typography variant="subtitle1" component="h2">Add a source</Typography>
         <Stack component="form" onSubmit={add} direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'flex-start' } }}>
           <TextField label="Name" required value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} sx={{ flex: 1 }} />
-          <TextField label="Web address of the folder" required type="url" value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} sx={{ flex: 2 }} />
+          <TextField label="Web address of the folder or sitemap" required type="url" value={draft.url} onChange={(e) => setDraft({ ...draft, url: e.target.value })} sx={{ flex: 2 }} />
           {types.length > 1 && (
             <TextField label="Kind" select value={draft.type} onChange={(e) => setDraft({ ...draft, type: e.target.value })} sx={{ minWidth: 140 }}>
               {types.map((t) => <MenuItem key={t.type} value={t.type}>{t.title}</MenuItem>)}
             </TextField>
+          )}
+          {draft.type === 'sitemap' && (
+            <TextField
+              label="Only addresses holding"
+              placeholder="/dataset/"
+              value={draft.only}
+              onChange={(e) => setDraft({ ...draft, only: e.target.value })}
+              sx={{ flex: 1 }}
+            />
           )}
           <Button type="submit" variant="contained" sx={{ mt: { sm: '6px !important' } }}>Add</Button>
         </Stack>

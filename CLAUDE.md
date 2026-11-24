@@ -14,13 +14,13 @@ This file covers only the commands and the traps.
 
 An early prototype. Built: the `CoreDiscovery` submission form (draft saving, ORCID/ROR pickers,
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
-web folders with a worker; the DCAT catalog feed; record addresses with content negotiation; and
+web folders and sitemaps with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
 the signed-in user; a landing page, a list of records with a plain word search, and a harvest
 page for admins (`web/src/pages.jsx`). The dry run (plan day 9) was done by script; its findings are in
 `docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
-other harvesters, mappings into CDIF, publishing of submitted records, search, CSW, OGC API
-Records and the sitemap. Do not start those without being asked.
+the other harvesters (CSW, OAI-PMH, CKAN, STAC, DCAT, file upload), mappings into CDIF, publishing
+of submitted records, search, CSW, OGC API Records and a sitemap of the catalog's own records. Do not start those without being asked.
 
 ## Commands
 
@@ -141,6 +141,9 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
 - **A CDIF record is validated against the profile its own catalog record declares**
   (`validate.profile_for`), not against a setting. The source's `profile` setting is only the
   fallback for a record that declares nothing we hold a profile for.
+- **The sitemap harvester takes a page's metadata from its embedded JSON-LD** (`sitemap.embedded_metadata`):
+  the block typed as a dataset, where a page holds several. It does not read a page's other markup.
+  A sitemap is the whole list, so a page no longer listed is withdrawn, as with a folder.
 - **`robots.txt` is obeyed by wrapping the HTTP client (`robots.Polite`), so a harvester must use
   the client it is given** and not open its own. A closed address raises `Disallowed`; a
   harvester walking a source catches it and skips that address. Only a closed starting point
