@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
-import { Alert, Box, Button, Container, CssBaseline, Stack, ThemeProvider, Typography } from '@mui/material';
+import { Alert, Box, Button, Container, CssBaseline, Link, Stack, ThemeProvider, Typography } from '@mui/material';
 import Account from './Account.jsx';
 import Completeness from './Completeness.jsx';
 import { correctDefaults, correctLayout, correctSchema } from './corrections.js';
@@ -78,6 +78,9 @@ const COPY_ID = (() => {
   const id = takeCopyId();
   return id && (!storedDraftId() || window.confirm(REPLACE_DRAFT)) ? id : null;
 })();
+
+// For the page that chooses what to show: a copy is being opened, so show the form.
+export const OPENING_COPY = !!COPY_ID;
 
 const timeOf = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -268,7 +271,8 @@ export default function App() {
     <ThemeProvider theme={theme}>
     <Container maxWidth="md" sx={{ py: 2 }}>
       <CssBaseline />
-      <Stack direction="row" sx={{ justifyContent: 'flex-end', minHeight: 32 }}>
+      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', minHeight: 32 }}>
+        <Link href="#/" underline="hover" variant="body2">CDIF Catalog</Link>
         <Account />
       </Stack>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'space-between' }}>

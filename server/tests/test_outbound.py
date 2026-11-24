@@ -163,3 +163,24 @@ def test_the_page_links_to_a_copy_of_the_record_in_the_form(catalog):
 def test_an_unpublished_or_unknown_record_is_not_found(catalog):
     assert catalog.get(f"/records/{catalog.add(MINIMAL, status='invalid')}").status_code == 404
     assert catalog.get(f"/records/{uuid4()}").status_code == 404
+
+
+def test_the_list_for_the_web_pages_shows_published_records_and_finds_them_by_their_words(catalog):
+    mark = uuid4().hex  # a word no other record has
+    found = catalog.add(MINIMAL, **{"schema:name": f"Zircon ages {mark}", "schema:description": "U-Pb dates"})
+    by_keyword = catalog.add(MINIMAL, **{"schema:name": "Other", "schema:keywords": ["basalt", f"{mark} 100%_pure"]})
+    hidden = catalog.add(MINIMAL, status="invalid", **{"schema:name": f"Hidden {mark}"})
+
+    listed = catalog.get("/api/records", params={"q": mark.upper()}).json()
+    assert {r["id"] for r in listed["records"]} == {found, by_keyword} and listed["total"] == 2
+    assert hidden not in {r["id"] for r in listed["records"]}
+    first = next(r for r in listed["records"] if r["id"] == found)
+    assert first["name"] == f"Zircon ages {mark}" and first["description"] == "U-Pb dates"
+
+    # the words are looked for as written: a percent sign or underscore is not a wildcard
+    assert catalog.get("/api/records", params={"q": f"{mark} 100%_pure"}).json()["total"] == 1
+    assert catalog.get("/api/records", params={"q": f"{mark} 100%xpure"}).json()["total"] == 0
+
+    everything = catalog.get("/api/records").json()
+    assert everything["total"] >= 2 and len(everything["records"]) <= 20
+    assert catalog.get("/api/records", params={"page": 0}).status_code == 422

@@ -16,7 +16,8 @@ An early prototype. Built: the `CoreDiscovery` submission form (draft saving, OR
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
 web folders with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
-the signed-in user. The dry run (plan day 9) was done by script; its findings are in
+the signed-in user; a landing page, a list of records with a plain word search, and a harvest
+page for admins (`web/src/pages.jsx`). The dry run (plan day 9) was done by script; its findings are in
 `docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
 other harvesters, mappings into CDIF, publishing of submitted records, search, CSW, OGC API
 Records and the sitemap. Do not start those without being asked.

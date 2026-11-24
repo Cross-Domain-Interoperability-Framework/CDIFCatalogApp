@@ -80,8 +80,14 @@ to be an administrator, to harvest.
 
 ## Looking at what the catalog holds
 
-There is no search page yet. You reach records through the catalog feed and through each
-record's own address.
+The catalog's first page offers four choices: browse records, create a new record, harvest
+records, and search the catalog.
+
+**Browse records** lists the published records, newest first, 20 to a page. Each title opens
+that record's page. **Search catalog** is the same list with a box for words: it keeps the
+records whose title, description or keywords hold what you type.
+
+Programs reach records through the catalog feed and through each record's own address.
 
 **The feed** lists every published record:
 
@@ -178,9 +184,15 @@ fetches each metadata file, turns it into CDIF and checks it.
 Today the catalog harvests one kind of source: a **web folder**, which is a web address that
 lists metadata files as links. You must be signed in as an administrator.
 
-There are no harvest pages in the web application yet. You use the catalog's interactive
-address list at **http://127.0.0.1:8000/docs**, which lets you fill in and send each request
-from the browser. Sign in at http://127.0.0.1:5173 first, in the same browser.
+**The quick way** is the harvest page: sign in, then choose "Harvest records" on the catalog's
+first page. Give the source a name and the web address of the folder and press "Add". Each
+source then has two buttons: "Harvest now" starts a run and shows its progress and its
+problems; "Retry failed" looks again at only the files that failed in the last run.
+
+The steps below do the same through the catalog's interactive address list at
+**http://127.0.0.1:8000/docs**, which lets you fill in and send each request from the browser,
+and offers a few things the page does not (clearing a source, stopping a run). Sign in at
+http://127.0.0.1:5173 first, in the same browser.
 
 ### 1. Register the source
 
@@ -304,8 +316,8 @@ Setting up sign-in is described in [setup-sandboxes.md](setup-sandboxes.md).
 
 ## What is not built yet
 
-- **Search and browsing.** Records are reached through the feed and their own addresses.
-- **Harvest pages in the web application.** Harvesting is done through the address list.
+- **A full search.** "Search catalog" looks for your words in each record's title, description
+  and keywords. It does not rank results or offer filters.
 - **Other kinds of source**: CSW, OAI-PMH, sitemaps, CKAN, STAC.
 - **Publishing a submitted record**, and any review step before it.
 - **Full checking of the profiles beyond core and discovery.**

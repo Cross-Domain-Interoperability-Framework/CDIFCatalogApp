@@ -163,7 +163,9 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | File | What it is |
 |---|---|
 | `src/main.jsx` | Entry point. |
-| `src/App.jsx` | The page: loads the form files, saves the draft as you type, and connects the parts below. |
+| `src/main.jsx` | Chooses the page from the part of the address after `#`: the landing page, the form (`#/new`), the list of records (`#/records`, `#/search`) or the harvest page (`#/harvest`). |
+| `src/pages.jsx` | The landing page with its four choices, the list of records with its search box, and the harvest page for administrators. |
+| `src/App.jsx` | The form page: loads the form files, saves the draft as you type, and connects the parts below. |
 | `src/corrections.js` | Corrections laid over the copied form files when the form loads: one for each known defect in them, and two choices made here (no "kind of resource" field; language starts as English). |
 | `src/Completeness.jsx` | The count of fields filled in, overall and tab by tab, shown above the form. |
 | `src/theme.js` | The form's sizes: 14px text in 36px boxes, following the compact profile the CEDAR Embeddable Editor documents. |
@@ -193,6 +195,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `GET /api/drafts/{id}` | Read a draft. A draft with an owner answers 404 to anyone else, here and in the two rows below. |
 | `PUT /api/drafts/{id}` | Replace a draft's document. A submitted record becomes a draft again. A draft with no owner becomes the signed-in person's. |
 | `POST /api/drafts/{id}/submit` | Validate the stored draft and mark it submitted if nothing must be fixed. Returns the report either way. |
+| `GET /api/records?q=&page=` | Published records the requester may see, newest first, 20 to a page, for the list and search pages. `q` keeps those whose title, description or keywords hold that text. |
 | `POST /api/validate` | Validate a document without saving it. Body: `{profile, document, id?}`. Returns `valid`, `counts`, `findings` and the completed `record`. |
 | `GET /api/lookup/organisations?q=` | Organisations from ROR. |
 | `GET /api/lookup/people?q=` | People from ORCID, by name or iD. |
