@@ -61,6 +61,7 @@ class Harvester:
 
 
 def harvesters() -> dict:
+    from app.harvest.sitemap import SitemapHarvester
     from app.harvest.waf import WafHarvester
 
-    return {h.type: h for h in (WafHarvester(),)}
+    return {h.type: h for h in (WafHarvester(), SitemapHarvester())}

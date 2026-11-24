@@ -181,11 +181,18 @@ If there is no "Sign in with ORCID" link, sign-in has not been set up on that co
 Harvesting is how most records get into the catalog. You point the catalog at a source, and it
 fetches each metadata file, turns it into CDIF and checks it.
 
-Today the catalog harvests one kind of source: a **web folder**, which is a web address that
-lists metadata files as links. You must be signed in as an administrator.
+Today the catalog harvests two kinds of source. You must be signed in as an administrator.
+
+- A **web folder** is a web address that lists metadata files as links.
+- A **sitemap** is the file a site publishes to list its pages, usually at `/sitemap.xml`. Each
+  page it lists is either a metadata file or a web page that carries its metadata inside it, as
+  many data repositories' dataset pages do. A sitemap lists every page of a site, so you can
+  give a piece of text that the wanted addresses hold, such as `/dataset/`; other pages are
+  left alone. A page with no metadata in it is reported as a problem and nothing is stored.
 
 **The quick way** is the harvest page: sign in, then choose "Harvest records" on the catalog's
-first page. Give the source a name and the web address of the folder and press "Add". Each
+first page. Give the source a name and the web address of the folder or sitemap, choose its kind, and
+press "Add". Each
 source then has two buttons: "Harvest now" starts a run and shows its progress and its
 problems; "Retry failed" looks again at only the files that failed in the last run.
 
@@ -318,7 +325,7 @@ Setting up sign-in is described in [setup-sandboxes.md](setup-sandboxes.md).
 
 - **A full search.** "Search catalog" looks for your words in each record's title, description
   and keywords. It does not rank results or offer filters.
-- **Other kinds of source**: CSW, OAI-PMH, sitemaps, CKAN, STAC.
+- **Other kinds of source**: CSW, OAI-PMH, CKAN, STAC.
 - **Publishing a submitted record**, and any review step before it.
 - **Full checking of the profiles beyond core and discovery.**
 - **Forms for the richer profiles.** The form covers core and discovery.
