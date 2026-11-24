@@ -12,8 +12,7 @@ that once, for every converter alike, with the same code they would have used:
 Which profiles it looks for is set in app/profile-sources.yaml. Called from here it reads its
 rule files from this repository, not from GitHub.
 
-Not connected yet, though a converter exists: DCAT (its entry point takes one dataset picked
-out of a graph, and a file may hold many) and SDMX (one dataflow out of a structure message).
+Not connected yet, though a converter exists: SDMX (one dataflow out of a structure message).
 """
 import importlib.util
 import json
@@ -228,6 +227,40 @@ def stac(content: str) -> dict:
     return _record(_script("STAC/stac_to_cdif.py").convert_stac_to_cdif(json.loads(content), detect=False))
 
 
+def _dcat(content: str, form: str) -> dict:
+    """One DCAT dataset. The converter's rules match prefixed names (`dcterms:title`), so the
+    document is read as a graph and written again in the converter's own prefixes first. A
+    document holding several datasets is a catalogue, and is for the DCAT harvester to split."""
+    import rdflib
+
+    module = _script("DCAT/dcat_to_cdif.py")
+    if form == "json-ld" and module.has_remote_context(json.loads(content)):
+        # reading it would fetch that address from here, unasked
+        raise HarvestError("The record names its JSON-LD context by address; harvest its source as a DCAT catalogue.")
+    graph = rdflib.Graph()
+    graph.parse(data=content, format=form, publicID="urn:dcat-source:")
+    data = json.loads(graph.serialize(format="json-ld", context=module.load_context(), auto_compact=True))
+    datasets = module.find_datasets(data)
+    if len(datasets) != 1:
+        raise HarvestError(
+            f"The file holds {len(datasets)} DCAT datasets; one per file is expected. "
+            "A file of many is a catalogue: harvest it as a source of the DCAT catalogue kind."
+        )
+    return _record(module.convert_dcat_to_cdif(datasets[0], detect=False, graph=module.build_node_index(data)))
+
+
+def dcat_jsonld(content: str) -> dict:
+    return _dcat(content, "json-ld")
+
+
+def dcat_rdfxml(content: str) -> dict:
+    return _dcat(content, "xml")
+
+
+def dcat_turtle(content: str) -> dict:
+    return _dcat(content, "turtle")
+
+
 # format id (from detect.py) -> the function that converts it
 CONNECTED = {
     "iso19139": iso,
@@ -249,4 +282,7 @@ CONNECTED = {
     "fgdc": fgdc,
     "ogc-capabilities": ogc_capabilities,
     "stac": stac,
+    "dcat-jsonld": dcat_jsonld,
+    "dcat-rdfxml": dcat_rdfxml,
+    "dcat-turtle": dcat_turtle,
 }

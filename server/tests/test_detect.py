@@ -153,8 +153,8 @@ def test_every_format_has_a_label_and_converters_point_into_the_converters_repos
 def test_cdif_passes_straight_through_and_everything_else_says_why_not():
     text = (FIXTURES / "exampleCDIFDiscoveryMinimal.json").read_text(encoding="utf-8")
     assert convert.to_cdif(detect(text), text) == json.loads(text)
-    with pytest.raises(HarvestError, match="DCAT RDF/XML.*DCAT/dcat_to_cdif.py.*not connected"):
-        convert.to_cdif(detect(XML["dcat-rdfxml"]), XML["dcat-rdfxml"])
+    with pytest.raises(HarvestError, match="SDMX-ML structure message.*SDMX/sdmx_to_cdif.py.*not connected"):
+        convert.to_cdif(detect(XML["sdmx-ml"]), XML["sdmx-ml"])
     with pytest.raises(HarvestError, match="ArcGIS metadata XML.*no converter"):
         convert.to_cdif(detect(XML["arcgis"]), XML["arcgis"])
     with pytest.raises(HarvestError, match="not valid JSON"):

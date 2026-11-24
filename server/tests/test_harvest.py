@@ -179,21 +179,18 @@ def test_a_file_that_is_not_json_is_kept_as_received_and_reported(db):
     assert records(db, source)["broken.json"]["received"] == "{not json"
 
 
-DCAT_RDF = (
-    '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:dcat="http://www.w3.org/ns/dcat#">'
-    "<dcat:Dataset/></rdf:RDF>"
-)
+SDMX = '<mes:Structure xmlns:mes="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message"/>'
 CONVERTERS = Path(__file__).parents[1] / "converters"
 
 
 def test_a_format_whose_converter_is_not_connected_is_recognised_kept_and_reported(db):
     source = new_source(db)
-    job = harvest(db, source, Folder({"record.rdf": ("30-Mar-2024 12:01", DCAT_RDF), "a.json": ("30-Mar-2024 12:01", MINIMAL)}))
+    job = harvest(db, source, Folder({"record.xml": ("30-Mar-2024 12:01", SDMX), "a.json": ("30-Mar-2024 12:01", MINIMAL)}))
     assert job["stats"]["added"] == 1 and job["stats"]["errored"] == 1
     message = job["errors"][0]["message"]
-    assert "DCAT RDF/XML" in message and "DCAT/dcat_to_cdif.py" in message
-    kept = records(db, source)["record.rdf"]
-    assert kept["received"] == DCAT_RDF and kept["received_format"] == "dcat-rdfxml" and kept["status"] == "invalid"
+    assert "SDMX-ML structure message" in message and "SDMX/sdmx_to_cdif.py" in message
+    kept = records(db, source)["record.xml"]
+    assert kept["received"] == SDMX and kept["received_format"] == "sdmx-ml" and kept["status"] == "invalid"
 
 
 def test_an_iso_record_is_converted_checked_and_published_with_the_catalogs_own_claim(db):

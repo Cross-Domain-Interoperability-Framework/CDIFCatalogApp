@@ -13,7 +13,7 @@ RUN npm run build
 # submodule moves, change this commit to match; CI fails if the two differ.
 FROM alpine:3.20 AS converters
 RUN apk add --no-cache git
-ARG CONVERTERS_COMMIT=8c02b1450f67120c633a1dbb64be374bdef438af
+ARG CONVERTERS_COMMIT=58fd83c976b6b3e987ef97a8278542753b70565a
 WORKDIR /converters
 RUN git init -q . \
     && git remote add origin https://github.com/Cross-Domain-Interoperability-Framework/converters.git \

@@ -181,7 +181,7 @@ If there is no "Sign in with ORCID" link, sign-in has not been set up on that co
 Harvesting is how most records get into the catalog. You point the catalog at a source, and it
 fetches each metadata file, turns it into CDIF and checks it.
 
-Today the catalog harvests five kinds of source. You must be signed in as an administrator.
+Today the catalog harvests six kinds of source. You must be signed in as an administrator.
 
 - A **web folder** is a web address that lists metadata files as links.
 - A **sitemap** is the file a site publishes to list its pages, usually at `/sitemap.xml`. Each
@@ -210,6 +210,12 @@ Today the catalog harvests five kinds of source. You must be signed in as an adm
   **collection** as one record. The single scenes or files inside a collection, which STAC
   calls items, are not harvested. A collection rarely says when it last changed, so each is
   fetched on every run and recognised as unchanged by its content.
+- A **DCAT catalogue** is one document, or a run of pages, that describes many datasets. Open
+  data portals publish these for each other: a CKAN portal at `/catalog.ttl`, a United States
+  agency at `/data.json`, and this catalog's own feed. Give the address of the document. The
+  catalog takes each dataset in it as one record, with its downloads, publisher and contact,
+  and follows the pages to the end. A dataset that has no web address of its own, only a short
+  identifier, is given the catalogue's address followed by that identifier.
 
 **The quick way** is the harvest page: sign in, then choose "Harvest records" on the catalog's
 first page. Give the source a name and the web address of the source, choose its kind, and
@@ -309,7 +315,7 @@ If some files failed for a passing reason, such as the source being briefly unre
 
 One record per file is expected. A file holding several is reported and not stored.
 
-More formats are **recognised but not converted**, among them DCAT, SDMX, ArcGIS metadata and
+More formats are **recognised but not converted**, among them SDMX, ArcGIS metadata and
 CKAN. Such a file is kept as received and reported with its format's name, so nothing
 is lost; it can be converted later, once a converter is connected.
 
