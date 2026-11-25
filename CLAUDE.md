@@ -174,7 +174,14 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   browser sends `bbox=west,south,east,north`; `outbound._bbox` rejects a box that is not four
   numbers, is out of range, or runs backwards. The map (`web/src/MapFilter.jsx`, vanilla Leaflet)
   can show past the edges of the world, so it **clamps** a drawn box to -180..180 / -90..90 before
-  sending it, or the server rejects it.
+  sending it, or the server rejects it. The map doubles as a results view: `visible_records`
+  returns each record's extent (`ST_XMin`/`Y`/`X`/`Y` of `bbox`), `list_records` passes it on as
+  each record's `bbox` (`[west, south, east, north]` or null), and `MapFilter` draws those areas,
+  fits the view to them when no box is drawn, and lifts the one whose id is `highlightId` (set when
+  the reader points at a card). The search page (`web/src/pages.jsx` `Records`, a wide `Page`) is a
+  filter sidebar beside a results column; the filters in force show as removable chips, whose label
+  for a scalar facet comes from the facet counts (the source chip's value is a uuid, its label the
+  source title).
 - **Search facets are counted by `store.facet_counts`, each over the query minus its own
   filter** (`_search_where(..., skip=name)`), so a chosen facet still shows its other values.
   There are two kinds. **Scalar facets** (`_FACET_VALUE`: source, publisher, profile) give a
