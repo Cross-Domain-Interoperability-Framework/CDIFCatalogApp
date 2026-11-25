@@ -95,6 +95,44 @@ ALTER TABLE records ADD COLUMN IF NOT EXISTS search tsvector GENERATED ALWAYS AS
 ) STORED;
 CREATE INDEX IF NOT EXISTS records_search ON records USING gin (search);
 
+-- A date bound from the start of an ISO string: a leading year, year-month or full date, padded
+-- to a full date. Any value that will not become a date (the OWL-Time object form, an out-of-range
+-- day) returns NULL. It catches every error, so it is safe in a generated column -- a bad value
+-- can never fail a save, as `date` once did on an out-of-range month.
+CREATE OR REPLACE FUNCTION cdif_date_bound(raw text) RETURNS date IMMUTABLE LANGUAGE plpgsql AS $fn$
+DECLARE m text;
+BEGIN
+    -- non-capturing groups, so substring() returns the whole match, not a captured part
+    m := substring(raw FROM '^\d{4}(?:-\d{2}(?:-\d{2})?)?');
+    IF m IS NULL THEN
+        RETURN NULL;
+    ELSIF length(m) = 4 THEN
+        m := m || '-01-01';
+    ELSIF length(m) = 7 THEN
+        m := m || '-01';
+    END IF;
+    RETURN m::date;
+EXCEPTION WHEN others THEN
+    RETURN NULL;
+END;
+$fn$;
+
+-- The dataset's own time span, read from the first schema:temporalCoverage, which is usually an
+-- ISO "start/end" string (a single date has no end, so the end falls back to the start). The
+-- OWL-Time object form a few records use is not read; those get no coverage dates. To change
+-- this, drop the columns and let them rebuild. Search filters on these; metadata dates are not
+-- indexed.
+ALTER TABLE records ADD COLUMN IF NOT EXISTS coverage_start date GENERATED ALWAYS AS (
+    cdif_date_bound(split_part(published->'schema:temporalCoverage'->>0, '/', 1))
+) STORED;
+ALTER TABLE records ADD COLUMN IF NOT EXISTS coverage_end date GENERATED ALWAYS AS (
+    coalesce(
+        cdif_date_bound(nullif(split_part(published->'schema:temporalCoverage'->>0, '/', 2), '')),
+        cdif_date_bound(split_part(published->'schema:temporalCoverage'->>0, '/', 1))
+    )
+) STORED;
+CREATE INDEX IF NOT EXISTS records_coverage ON records (coverage_start, coverage_end);
+
 CREATE TABLE IF NOT EXISTS harvest_jobs (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     source_id        uuid NOT NULL REFERENCES harvest_sources(id) ON DELETE CASCADE,
@@ -192,9 +230,10 @@ FACETS = tuple(_FACET_VALUE)
 PROFILE_LABELS = {"cdifCore": "Core", "CoreDiscovery": "Discovery"}
 
 
-def _search_where(user: access.User, containing, modified_since, filters, skip=None):
-    """The WHERE every search query shares: published, visible, matching the words, and narrowed
-    by each active facet filter (all but `skip`, so a facet's own counts are not narrowed by it)."""
+def _search_where(user: access.User, containing, modified_since, filters, skip=None, covers=None):
+    """The WHERE every search query shares: published, visible, matching the words, narrowed by
+    each active facet filter (all but `skip`, so a facet's own counts are not narrowed by it), and
+    by `covers`, a (from, to) window the record's own time span must overlap."""
     where = "r.status = 'published' AND r.labels && %s"
     params: list = [access.user_labels(user)]
     if containing:
@@ -207,12 +246,21 @@ def _search_where(user: access.User, containing, modified_since, filters, skip=N
         if value and name != skip and name in _FACET_VALUE:
             where += f" AND {_FACET_VALUE[name]} = %s"
             params.append(value)
+    if covers:
+        after, before = covers
+        where += " AND r.coverage_start IS NOT NULL"  # a record with no time span cannot be placed
+        if after is not None:
+            where += " AND r.coverage_end >= %s"
+            params.append(after)
+        if before is not None:
+            where += " AND r.coverage_start <= %s"
+            params.append(before)
     return where, params
 
 
 def visible_records(
     conn, user: access.User, modified_since=None, limit: int = 100, offset: int = 0,
-    containing=None, order="modified", filters=None,
+    containing=None, order="modified", filters=None, covers=None,
 ):
     """(total, rows) of published records the user may see.
 
@@ -220,8 +268,8 @@ def visible_records(
     hold those words, in any letter case and whatever their endings ("ages" finds "age").
     `filters` is a {facet: value} map from FACETS that narrows the set further. `order` is one of
     ORDERS: by relevance to the words (a match in the title counting most), most recently changed
-    first, or by title."""
-    where, params = _search_where(user, containing, modified_since, filters)
+    first, or by title. `covers` is a (from, to) date window the record's time span must overlap."""
+    where, params = _search_where(user, containing, modified_since, filters, covers=covers)
     by, ranked = "r.changed_at DESC, r.id", []
     if order == "relevance" and containing:
         by, ranked = f"ts_rank(r.search, {_WORDS}) DESC, r.changed_at DESC, r.id", [containing]
@@ -235,13 +283,13 @@ def visible_records(
     return total, rows
 
 
-def facet_counts(conn, user: access.User, containing=None, modified_since=None, filters=None, per_facet: int = 12):
+def facet_counts(conn, user: access.User, containing=None, modified_since=None, filters=None, covers=None, per_facet: int = 12):
     """For each facet, the values present among the matching records, each with how many records
     carry it, most first. A facet's own filter does not narrow its own counts, so the other
     values in a chosen facet stay visible."""
     out = {}
     for name in FACETS:
-        where, params = _search_where(user, containing, modified_since, filters, skip=name)
+        where, params = _search_where(user, containing, modified_since, filters, skip=name, covers=covers)
         value = _FACET_VALUE[name]
         join = "JOIN harvest_sources s ON s.id = r.source_id" if name == "source" else ""
         label = "s.title" if name == "source" else value

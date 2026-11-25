@@ -124,7 +124,7 @@ const FACET_LABELS = { source: 'Source', publisher: 'Published by', profile: 'De
 export function Records({ searching }) {
   const [text, setText] = useState('');
   const [sort, setSort] = useState('relevance');
-  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance', source: '', publisher: '', profile: '' });
+  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance', source: '', publisher: '', profile: '', start: '', end: '' });
   const [found, setFound] = useState(null);
   const [error, setError] = useState(null);
 
@@ -132,6 +132,7 @@ export function Records({ searching }) {
     let current = true;
     const params = new URLSearchParams({ page: query.page, sort: query.sort, ...(query.q ? { q: query.q } : {}) });
     Object.keys(FACET_LABELS).forEach((k) => { if (query[k]) params.set(k, query[k]); });
+    ['start', 'end'].forEach((k) => { if (query[k]) params.set(k, query[k]); });
     api('GET', `/api/records?${params}`)
       .then((answer) => current && (setFound(answer), setError(null)))
       .catch((e) => current && setError(e.message));
@@ -145,6 +146,8 @@ export function Records({ searching }) {
 
   const toggleFacet = (name, value) =>
     setQuery((prev) => ({ ...prev, [name]: prev[name] === value ? '' : value, page: 1 }));
+
+  const setDate = (which, value) => setQuery((prev) => ({ ...prev, [which]: value, page: 1 }));
 
   const reorder = (value) => {
     setSort(value);
@@ -167,6 +170,15 @@ export function Records({ searching }) {
           <MenuItem value="title">Title</MenuItem>
         </TextField>
         <Button type="submit" variant="contained">Search</Button>
+      </Stack>
+      <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
+        <Typography variant="body2" color="text.secondary">Data covering</Typography>
+        <TextField type="date" label="from" size="small" InputLabelProps={{ shrink: true }} value={query.start} onChange={(e) => setDate('start', e.target.value)} sx={{ width: 170 }} />
+        <Typography variant="body2" color="text.secondary">to</Typography>
+        <TextField type="date" label="to" size="small" InputLabelProps={{ shrink: true }} value={query.end} onChange={(e) => setDate('end', e.target.value)} sx={{ width: 170 }} />
+        {(query.start || query.end) && (
+          <Button size="small" onClick={() => setQuery((prev) => ({ ...prev, start: '', end: '', page: 1 }))}>Clear dates</Button>
+        )}
       </Stack>
       {error && <Alert severity="error">{error}</Alert>}
       {found && (

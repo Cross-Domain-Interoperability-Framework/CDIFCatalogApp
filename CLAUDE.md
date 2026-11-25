@@ -146,6 +146,17 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   the `jsonb_path_query_array` expressions must stay valid for every published shape, or an
   insert fails. `visible_records(..., containing=, order=)` turns the words into a
   `websearch_to_tsquery` and ranks with `ts_rank`; `order` is one of `store.ORDERS`.
+- **The date-range filter reads two generated `date` columns, `coverage_start`/`coverage_end`**,
+  built from the first `schema:temporalCoverage` (usually an ISO `start/end` string; a single
+  date has no end, so the end falls back to the start). They use the immutable `cdif_date_bound`
+  SQL function, which must swallow every error: `date` casting raised `DatetimeFieldOverflow` on
+  an out-of-range value and crashed startup once, so the function is `plpgsql` with
+  `EXCEPTION WHEN others THEN RETURN NULL`. Its regex uses **non-capturing** groups
+  (`(?:...)`), because Postgres `substring()` with a capturing group returns the captured part,
+  not the whole match. The OWL-Time object form a few records use is not read. `covers=(from, to)`
+  in `_search_where` adds the overlap; a record with no span is excluded once a window is set.
+  These are `STORED`, so changing the function does not recompute them: drop the columns (and the
+  `records_coverage` index) and let `SCHEMA` rebuild them.
 - **Search facets are counted by `store.facet_counts`, each over the query minus its own
   filter** (`_search_where(..., skip=name)`), so a chosen facet still shows its other values.
   The facets are `store.FACETS` (source, publisher, profile); `_FACET_VALUE` holds the SQL for
