@@ -3,7 +3,9 @@
 # The database password below is a local development value, not a secret.
 services:
   db:
-    image: postgres:17
+    # PostGIS on PostgreSQL 17 (same data layout as postgres:17, so the volume is unchanged).
+    # Render's managed database has PostGIS too; the app enables it with CREATE EXTENSION.
+    image: postgis/postgis:17-3.5
     environment:
       POSTGRES_USER: catalog
       POSTGRES_PASSWORD: catalog-dev

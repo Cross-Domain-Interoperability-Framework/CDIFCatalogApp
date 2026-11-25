@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17
+        image: postgis/postgis:17-3.5  # the schema enables PostGIS, which plain postgres lacks
         env:
           POSTGRES_USER: catalog
           POSTGRES_PASSWORD: catalog-ci

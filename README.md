@@ -186,6 +186,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `src/lookup.jsx` | The search boxes those controls use, backed by `/api/lookup/…`. |
 | `src/Report.jsx` | "Check and submit": shows the server's findings and links each one to its field. |
 | `src/Account.jsx` | The "Sign in with ORCID" link, and who is signed in. Hidden when the server has no ORCID client. |
+| `src/MapFilter.jsx` | The search page's map: a box drawn on it (Leaflet) filters records by the area they cover. |
 | `src/wording.js`, `src/wording/CoreDiscovery.json` | The plain-language label and help line for every field, laid over the copied layout without editing it. |
 | `public/forms/CoreDiscovery/schema.json`, `uischema.json`, `defaults.json` | The form's data shape, its layout, and the blank record. Copied from metadataBuildingBlocks. |
 | `public/forms/PINNED.md` | Which commit those files come from. |
@@ -201,7 +202,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `GET /api/drafts/{id}` | Read a draft. A draft with an owner answers 404 to anyone else, here and in the two rows below. |
 | `PUT /api/drafts/{id}` | Replace a draft's document. A submitted record becomes a draft again. A draft with no owner becomes the signed-in person's. |
 | `POST /api/drafts/{id}/submit` | Validate the stored draft and mark it submitted if nothing must be fixed. Returns the report either way. |
-| `GET /api/records?q=&page=&sort=&source=&publisher=&profile=&keyword=&kind=&start=&end=` | Published records the requester may see, 20 to a page, for the list and search pages. `q` keeps those whose title, keywords, creators, variable names or description hold those words (ranked, stemmed, `websearch` syntax). `sort` is `relevance` (the default with words), `modified` (the default without, newest first) or `title`. `source`, `publisher`, `profile`, `keyword` and `kind` each keep the records with that facet value (keyword and kind are multi-valued); `start` and `end` (ISO dates) keep the records whose own time span overlaps that window. The answer carries `facets` (each value's count for the current query), the active `filters`, and the `covers` window. |
+| `GET /api/records?q=&page=&sort=&source=&publisher=&profile=&keyword=&kind=&start=&end=&bbox=` | Published records the requester may see, 20 to a page, for the list and search pages. `q` keeps those whose title, keywords, creators, variable names or description hold those words (ranked, stemmed, `websearch` syntax). `sort` is `relevance` (the default with words), `modified` (the default without, newest first) or `title`. `source`, `publisher`, `profile`, `keyword` and `kind` each keep the records with that facet value (keyword and kind are multi-valued); `start` and `end` (ISO dates) keep the records whose own time span overlaps that window; `bbox` (`west,south,east,north`) keeps those whose own area overlaps that box. The answer carries `facets` (each value's count for the current query), the active `filters`, the `covers` window and the `bbox`. |
 | `POST /api/validate` | Validate a document without saving it. Body: `{profile, document, id?}`. Returns `valid`, `counts`, `findings` and the completed `record`. |
 | `GET /api/lookup/organisations?q=` | Organisations from ROR. |
 | `GET /api/lookup/people?q=` | People from ORCID, by name or iD. |

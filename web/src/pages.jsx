@@ -11,6 +11,7 @@ import CloudDownloadOutlined from '@mui/icons-material/CloudDownloadOutlined';
 import ListAlt from '@mui/icons-material/ListAlt';
 import Search from '@mui/icons-material/Search';
 import Account from './Account.jsx';
+import { MapFilter } from './MapFilter.jsx';
 import theme from './theme.js';
 
 async function api(method, path, body) {
@@ -124,7 +125,7 @@ const FACET_LABELS = { source: 'Source', publisher: 'Published by', profile: 'De
 export function Records({ searching }) {
   const [text, setText] = useState('');
   const [sort, setSort] = useState('relevance');
-  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance', source: '', publisher: '', profile: '', keyword: '', kind: '', start: '', end: '' });
+  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance', source: '', publisher: '', profile: '', keyword: '', kind: '', start: '', end: '', bbox: '' });
   const [found, setFound] = useState(null);
   const [error, setError] = useState(null);
 
@@ -132,7 +133,7 @@ export function Records({ searching }) {
     let current = true;
     const params = new URLSearchParams({ page: query.page, sort: query.sort, ...(query.q ? { q: query.q } : {}) });
     Object.keys(FACET_LABELS).forEach((k) => { if (query[k]) params.set(k, query[k]); });
-    ['start', 'end'].forEach((k) => { if (query[k]) params.set(k, query[k]); });
+    ['start', 'end', 'bbox'].forEach((k) => { if (query[k]) params.set(k, query[k]); });
     api('GET', `/api/records?${params}`)
       .then((answer) => current && (setFound(answer), setError(null)))
       .catch((e) => current && setError(e.message));
@@ -180,6 +181,7 @@ export function Records({ searching }) {
           <Button size="small" onClick={() => setQuery((prev) => ({ ...prev, start: '', end: '', page: 1 }))}>Clear dates</Button>
         )}
       </Stack>
+      <MapFilter value={query.bbox} onChange={(bbox) => setQuery((prev) => ({ ...prev, bbox, page: 1 }))} />
       {error && <Alert severity="error">{error}</Alert>}
       {found && (
         <>
