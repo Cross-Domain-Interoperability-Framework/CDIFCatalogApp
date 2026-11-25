@@ -159,10 +159,21 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   `records_coverage` index) and let `SCHEMA` rebuild them.
 - **Search facets are counted by `store.facet_counts`, each over the query minus its own
   filter** (`_search_where(..., skip=name)`), so a chosen facet still shows its other values.
-  The facets are `store.FACETS` (source, publisher, profile); `_FACET_VALUE` holds the SQL for
-  each (publisher is read from the published JSON, so a record whose publisher is a list or
-  absent is not counted). `visible_records` and `facet_counts` share `_search_where`; the
-  record table is aliased `r` there and `harvest_sources` is joined only for the source facet.
+  There are two kinds. **Scalar facets** (`_FACET_VALUE`: source, publisher, profile) give a
+  record one value; the SQL yields it, the filter tests `=`, and counts `GROUP BY` it (publisher
+  is read from the published JSON, so a record whose publisher is a list or absent is not
+  counted). **Set facets** (`_FACET_SET`: keyword, kind) give a record many values, from the
+  generated `jsonb` array columns `records.keywords` and `records.kind`; the filter tests
+  membership with the jsonb `?` operator, and counts unnest the array with
+  `jsonb_array_elements_text` and `count(DISTINCT r.id)`. `FACETS` is the two maps joined. Those
+  two columns are `GENERATED ALWAYS ... STORED`, built from `published` with
+  `jsonb_path_query_array`: `keywords` gathers each keyword's text whether it came as a plain
+  string or a `schema:DefinedTerm` name, `kind` the same two shapes from `schema:additionalType`.
+  To change what is gathered, `ALTER TABLE records DROP COLUMN keywords` (or `kind`) once so the
+  `ADD COLUMN IF NOT EXISTS` rebuilds it; restart `api` to run the schema. The facet values are
+  shown as stored (a kind like `geographicDataset` is not yet mapped to a plain-language label).
+  `visible_records` and `facet_counts` share `_search_where`; the record table is aliased `r`
+  there and `harvest_sources` is joined only for the source facet.
 - **A CDIF record is validated against the profile its own catalog record declares**
   (`validate.profile_for`), not against a setting. The source's `profile` setting is only the
   fallback for a record that declares nothing we hold a profile for.

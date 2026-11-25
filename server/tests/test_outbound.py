@@ -234,6 +234,39 @@ def test_search_offers_facets_and_filters_by_them(catalog):
     assert catalog.get("/api/records", params={"q": mark, "publisher": "nobody at all"}).json()["total"] == 0
 
 
+def test_search_offers_keyword_and_kind_facets_and_filters_by_them(catalog):
+    mark = "kk" + uuid4().hex[:8]
+    geo, term = f"{mark}-geo", {"@type": ["schema:DefinedTerm"], "schema:name": f"{mark}-term"}
+    a = catalog.add(MINIMAL, **{
+        "schema:name": f"{mark} a", "schema:keywords": [geo, term],
+        "schema:additionalType": [{"@type": ["schema:DefinedTerm"], "schema:name": f"{mark}-dataset"}],
+    })
+    b = catalog.add(MINIMAL, **{
+        "schema:name": f"{mark} b", "schema:keywords": [geo], "schema:additionalType": f"{mark}-doc",
+    })
+    plain = catalog.add(MINIMAL, **{"schema:name": f"{mark} plain"})  # no keyword, no kind
+
+    everything = catalog.get("/api/records", params={"q": mark}).json()
+    # a keyword that came as a plain string and one that came as a DefinedTerm are both gathered
+    keywords = {f["value"]: f["count"] for f in everything["facets"]["keyword"]}
+    assert keywords[geo] == 2 and keywords[f"{mark}-term"] == 1
+    # kind comes from additionalType, as an object with a name or as a plain string
+    kinds = {f["value"]: f["count"] for f in everything["facets"]["kind"]}
+    assert kinds == {f"{mark}-dataset": 1, f"{mark}-doc": 1}
+
+    # choosing a keyword keeps only the records carrying it, and echoes the choice back
+    chosen = catalog.get("/api/records", params={"q": mark, "keyword": geo}).json()
+    assert chosen["total"] == 2 and {r["id"] for r in chosen["records"]} == {a, b}
+    assert chosen["filters"] == {"keyword": geo}
+    # a facet's own filter does not hide its other values, so the DefinedTerm keyword is still offered
+    assert f"{mark}-term" in {f["value"] for f in chosen["facets"]["keyword"]}
+
+    # choosing a kind works the same, string form included
+    assert {r["id"] for r in catalog.get("/api/records", params={"q": mark, "kind": f"{mark}-doc"}).json()["records"]} == {b}
+    # a record with neither is not matched by either filter
+    assert plain not in {r["id"] for r in catalog.get("/api/records", params={"q": mark, "keyword": geo}).json()["records"]}
+
+
 def test_search_filters_by_the_time_a_record_covers(catalog):
     mark = "dd" + uuid4().hex[:8]
     old = catalog.add(MINIMAL, **{"schema:name": f"{mark} old", "schema:temporalCoverage": ["1990-01-01/1995-12-31"]})
