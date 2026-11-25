@@ -119,12 +119,12 @@ export function Home() {
 // ---- the list of records, and the search --------------------------------------------------------
 
 // The facets the search offers, in the plain words shown beside each row of choices.
-const FACET_LABELS = { source: 'Source', publisher: 'Published by', profile: 'Detail' };
+const FACET_LABELS = { source: 'Source', publisher: 'Published by', profile: 'Detail', keyword: 'Keyword', kind: 'Kind' };
 
 export function Records({ searching }) {
   const [text, setText] = useState('');
   const [sort, setSort] = useState('relevance');
-  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance', source: '', publisher: '', profile: '', start: '', end: '' });
+  const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance', source: '', publisher: '', profile: '', keyword: '', kind: '', start: '', end: '' });
   const [found, setFound] = useState(null);
   const [error, setError] = useState(null);
 

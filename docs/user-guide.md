@@ -89,8 +89,9 @@ records whose title, keywords, creators, measured variables or description hold 
 and shows the best match first. A word matches whatever its ending, so "ages" finds "age"; put
 "two words" in quotes to keep them together, and -word to leave a word out. The list can be
 ordered by best match, by what changed most recently, or by title. Below the box, chips narrow
-the results by where a record came from, who published it, and how detailed it is; the number
-on each chip is how many records it would leave. The "Data covering" dates keep only records
+the results by where a record came from, who published it, how detailed it is, and its keywords
+and kind; the number on each chip is how many records it would leave. The "Data covering" dates
+keep only records
 whose own time span overlaps that window; a record that gives no time span is left out while a
 date is set.
 
@@ -365,9 +366,9 @@ Setting up sign-in is described in [setup-sandboxes.md](setup-sandboxes.md).
 
 ## What is not built yet
 
-- **A map and keyword filters.** "Search catalog" ranks records by your words and narrows them
-  by source, publisher, detail level and the time the data covers, but it has no filter by
-  keyword or kind, no geologic-age range, and no map to search by place.
+- **A map and a geologic-age range.** "Search catalog" ranks records by your words and narrows
+  them by source, publisher, detail level, keyword, kind and the time the data covers, but it has
+  no geologic-age range in millions of years, and no map to search by place.
 - **A CKAN source.** A CKAN portal that publishes a DCAT feed can be harvested as a DCAT
   catalogue today; one without such a feed cannot yet.
 - **Publishing a submitted record**, and any review step before it.

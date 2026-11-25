@@ -133,22 +133,25 @@ def _date(value: str | None, which: str):
 def list_records(
     q: str | None = None, page: int = 1, sort: str | None = None,
     source: str | None = None, publisher: str | None = None, profile: str | None = None,
+    keyword: str | None = None, kind: str | None = None,
     start: str | None = None, end: str | None = None,
     user: access.User = Depends(auth.current_user),
 ) -> dict:
     """Published records the requester may see, for the browse and search pages. `q` keeps those
     holding those words. `sort` is `relevance` (the usual order when there are words), `modified`
     (most recently changed first, the usual order when there are none) or `title`. `source`,
-    `publisher` and `profile` each keep the records with that facet value. `start` and `end` (ISO
-    dates) keep the records whose own time span overlaps that window. The answer carries the facet
-    counts and the active `filters` for the current query so the page can offer them."""
+    `publisher`, `profile`, `keyword` and `kind` each keep the records with that facet value.
+    `start` and `end` (ISO dates) keep the records whose own time span overlaps that window. The
+    answer carries the facet counts and the active `filters` for the current query so the page can
+    offer them."""
     if page < 1:
         raise HTTPException(422, "page starts at 1.")
     q = (q or "").strip()
     sort = sort or ("relevance" if q else "modified")
     if sort not in store.ORDERS:
         raise HTTPException(422, "sort must be one of: " + ", ".join(store.ORDERS))
-    filters = {k: v.strip() for k, v in {"source": source, "publisher": publisher, "profile": profile}.items() if v and v.strip()}
+    wanted = {"source": source, "publisher": publisher, "profile": profile, "keyword": keyword, "kind": kind}
+    filters = {k: v.strip() for k, v in wanted.items() if v and v.strip()}
     after, before = _date(start, "start"), _date(end, "end")
     if after and before and after > before:
         raise HTTPException(422, "start must be on or before end.")

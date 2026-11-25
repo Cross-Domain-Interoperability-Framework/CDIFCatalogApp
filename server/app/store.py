@@ -133,6 +133,23 @@ ALTER TABLE records ADD COLUMN IF NOT EXISTS coverage_end date GENERATED ALWAYS 
 ) STORED;
 CREATE INDEX IF NOT EXISTS records_coverage ON records (coverage_start, coverage_end);
 
+-- The flat lists the keyword and kind facets count and filter on, kept by the database from the
+-- published record so no save can forget them. `keywords` gathers each keyword's text, whether it
+-- came as a plain string or a schema:DefinedTerm with a schema:name. `kind` gathers the record's
+-- resource type(s) from schema:additionalType, the same two shapes. Each is a jsonb array of
+-- strings (empty when the record has none); a facet filter tests membership with the jsonb `?`
+-- operator. To change what is gathered, drop the column and let this add it again.
+ALTER TABLE records ADD COLUMN IF NOT EXISTS keywords jsonb GENERATED ALWAYS AS (
+    jsonb_path_query_array(coalesce(published, '{}'), '$."schema:keywords"[*] ? (@.type() == "string")')
+    || jsonb_path_query_array(coalesce(published, '{}'), '$."schema:keywords"[*]."schema:name"')
+) STORED;
+ALTER TABLE records ADD COLUMN IF NOT EXISTS kind jsonb GENERATED ALWAYS AS (
+    jsonb_path_query_array(coalesce(published, '{}'), '$."schema:additionalType"[*]."schema:name"')
+    || jsonb_path_query_array(coalesce(published, '{}'), '$."schema:additionalType"[*] ? (@.type() == "string")')
+) STORED;
+CREATE INDEX IF NOT EXISTS records_keywords ON records USING gin (keywords);
+CREATE INDEX IF NOT EXISTS records_kind ON records USING gin (kind);
+
 CREATE TABLE IF NOT EXISTS harvest_jobs (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     source_id        uuid NOT NULL REFERENCES harvest_sources(id) ON DELETE CASCADE,
@@ -218,14 +235,20 @@ _WORDS = "websearch_to_tsquery('english', %s)"
 # How a list of records can be ordered. "relevance" needs words to rank by.
 ORDERS = ("relevance", "modified", "title")
 
-# The facets a search offers, each a key, and the SQL giving one record its value in that facet:
-# where it came from (the harvest source), who published it, and the detail level it reaches.
+# The facets a search offers. A scalar facet gives one record one value: where it came from (the
+# harvest source), who published it, the detail level it reaches. The SQL yields that value.
 _FACET_VALUE = {
     "source": "r.source_id::text",
     "publisher": "r.published->'schema:publisher'->>'schema:name'",
     "profile": "r.profile",
 }
-FACETS = tuple(_FACET_VALUE)
+# A set facet gives one record many values, from a generated jsonb array column: its keywords and
+# its resource kind(s). A filter tests membership; counts unnest the array.
+_FACET_SET = {
+    "keyword": "r.keywords",
+    "kind": "r.kind",
+}
+FACETS = tuple(_FACET_VALUE) + tuple(_FACET_SET)
 # The internal profile names, in the plain words the facet shows.
 PROFILE_LABELS = {"cdifCore": "Core", "CoreDiscovery": "Discovery"}
 
@@ -243,8 +266,13 @@ def _search_where(user: access.User, containing, modified_since, filters, skip=N
         where += " AND r.changed_at >= %s"
         params.append(modified_since)
     for name, value in (filters or {}).items():
-        if value and name != skip and name in _FACET_VALUE:
+        if not value or name == skip:
+            continue
+        if name in _FACET_VALUE:
             where += f" AND {_FACET_VALUE[name]} = %s"
+            params.append(value)
+        elif name in _FACET_SET:  # the chosen value is one of the record's many
+            where += f" AND {_FACET_SET[name]} ? %s"
             params.append(value)
     if covers:
         after, before = covers
@@ -290,6 +318,16 @@ def facet_counts(conn, user: access.User, containing=None, modified_since=None, 
     out = {}
     for name in FACETS:
         where, params = _search_where(user, containing, modified_since, filters, skip=name, covers=covers)
+        if name in _FACET_SET:  # one record counts once for each of its values
+            value = _FACET_SET[name]
+            rows = conn.execute(
+                f"SELECT v AS value, count(DISTINCT r.id) AS n FROM records r, "
+                f"LATERAL jsonb_array_elements_text({value}) AS v WHERE {where} AND v <> '' "
+                f"GROUP BY v ORDER BY n DESC, v LIMIT %s",
+                params + [per_facet],
+            ).fetchall()
+            out[name] = [{"value": row["value"], "label": row["value"], "count": row["n"]} for row in rows]
+            continue
         value = _FACET_VALUE[name]
         join = "JOIN harvest_sources s ON s.id = r.source_id" if name == "source" else ""
         label = "s.title" if name == "source" else value
