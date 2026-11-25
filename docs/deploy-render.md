@@ -14,7 +14,7 @@ This is for letting colleagues look at the prototype. It is not a production dep
 | Thing | What it is |
 |---|---|
 | `cdif-catalog` | One web service, built from `deploy/Dockerfile`. It holds the built web app and the server in one container, and runs the harvest worker beside the server. |
-| `cdif-catalog-db` | A PostgreSQL 17 database. The service is given its address automatically. |
+| `cdif-catalog-db` | A PostgreSQL 17 database. The service is given its address automatically. The app enables PostGIS on it (`CREATE EXTENSION IF NOT EXISTS postgis`) at startup, for the map search; Render's managed Postgres provides it, and the database role may create it, so nothing is set up by hand. |
 
 One container does everything because Render has no free background worker. The page, the API,
 the catalog feed and the record addresses are all served from the one address, so no proxy is

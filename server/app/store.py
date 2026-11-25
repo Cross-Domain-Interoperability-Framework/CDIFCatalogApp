@@ -14,6 +14,10 @@ from psycopg.rows import dict_row
 from app import access
 
 SCHEMA = """
+-- PostGIS backs the map filter (the bbox column below). The catalog's database role may create it
+-- on both the dev image and Render's managed database; it is harmless if already there.
+CREATE EXTENSION IF NOT EXISTS postgis;
+
 CREATE TABLE IF NOT EXISTS users (
     id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     orcid          text NOT NULL UNIQUE,
@@ -150,6 +154,29 @@ ALTER TABLE records ADD COLUMN IF NOT EXISTS kind jsonb GENERATED ALWAYS AS (
 CREATE INDEX IF NOT EXISTS records_keywords ON records USING gin (keywords);
 CREATE INDEX IF NOT EXISTS records_kind ON records USING gin (kind);
 
+-- The record's area as a geometry, for the map filter. Read from the first schema:spatialCoverage's
+-- schema:geo schema:box, a schema.org GeoShape box: "lat lon lat lon", the lower corner then the
+-- upper (least/greatest sorts them, so either order works). Anything that will not parse into four
+-- numbers returns NULL, so a bad box can never fail a save. Points, lines and polygons are not read
+-- yet; those records get no geometry.
+CREATE OR REPLACE FUNCTION cdif_bbox(box text) RETURNS geometry IMMUTABLE LANGUAGE plpgsql AS $fn$
+DECLARE p text[];
+BEGIN
+    IF box IS NULL THEN RETURN NULL; END IF;
+    p := regexp_split_to_array(btrim(box), '\s+');
+    IF array_length(p, 1) <> 4 THEN RETURN NULL; END IF;
+    RETURN ST_MakeEnvelope(
+        least(p[2]::float8, p[4]::float8), least(p[1]::float8, p[3]::float8),   -- min lon, min lat
+        greatest(p[2]::float8, p[4]::float8), greatest(p[1]::float8, p[3]::float8), 4326);  -- max lon, max lat
+EXCEPTION WHEN others THEN
+    RETURN NULL;
+END;
+$fn$;
+ALTER TABLE records ADD COLUMN IF NOT EXISTS bbox geometry(Geometry, 4326) GENERATED ALWAYS AS (
+    cdif_bbox(published->'schema:spatialCoverage'->0->'schema:geo'->>'schema:box')
+) STORED;
+CREATE INDEX IF NOT EXISTS records_bbox ON records USING gist (bbox);
+
 CREATE TABLE IF NOT EXISTS harvest_jobs (
     id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     source_id        uuid NOT NULL REFERENCES harvest_sources(id) ON DELETE CASCADE,
@@ -253,10 +280,11 @@ FACETS = tuple(_FACET_VALUE) + tuple(_FACET_SET)
 PROFILE_LABELS = {"cdifCore": "Core", "CoreDiscovery": "Discovery"}
 
 
-def _search_where(user: access.User, containing, modified_since, filters, skip=None, covers=None):
+def _search_where(user: access.User, containing, modified_since, filters, skip=None, covers=None, within=None):
     """The WHERE every search query shares: published, visible, matching the words, narrowed by
-    each active facet filter (all but `skip`, so a facet's own counts are not narrowed by it), and
-    by `covers`, a (from, to) window the record's own time span must overlap."""
+    each active facet filter (all but `skip`, so a facet's own counts are not narrowed by it), by
+    `covers`, a (from, to) window the record's own time span must overlap, and by `within`, a
+    (west, south, east, north) box the record's own area must overlap."""
     where = "r.status = 'published' AND r.labels && %s"
     params: list = [access.user_labels(user)]
     if containing:
@@ -283,12 +311,15 @@ def _search_where(user: access.User, containing, modified_since, filters, skip=N
         if before is not None:
             where += " AND r.coverage_start <= %s"
             params.append(before)
+    if within:  # a record with no area is left out, as && with a null geometry is not true
+        where += " AND r.bbox && ST_MakeEnvelope(%s, %s, %s, %s, 4326)"
+        params += list(within)
     return where, params
 
 
 def visible_records(
     conn, user: access.User, modified_since=None, limit: int = 100, offset: int = 0,
-    containing=None, order="modified", filters=None, covers=None,
+    containing=None, order="modified", filters=None, covers=None, within=None,
 ):
     """(total, rows) of published records the user may see.
 
@@ -296,8 +327,9 @@ def visible_records(
     hold those words, in any letter case and whatever their endings ("ages" finds "age").
     `filters` is a {facet: value} map from FACETS that narrows the set further. `order` is one of
     ORDERS: by relevance to the words (a match in the title counting most), most recently changed
-    first, or by title. `covers` is a (from, to) date window the record's time span must overlap."""
-    where, params = _search_where(user, containing, modified_since, filters, covers=covers)
+    first, or by title. `covers` is a (from, to) date window the record's time span must overlap;
+    `within` is a (west, south, east, north) box the record's area must overlap."""
+    where, params = _search_where(user, containing, modified_since, filters, covers=covers, within=within)
     by, ranked = "r.changed_at DESC, r.id", []
     if order == "relevance" and containing:
         by, ranked = f"ts_rank(r.search, {_WORDS}) DESC, r.changed_at DESC, r.id", [containing]
@@ -311,13 +343,13 @@ def visible_records(
     return total, rows
 
 
-def facet_counts(conn, user: access.User, containing=None, modified_since=None, filters=None, covers=None, per_facet: int = 12):
+def facet_counts(conn, user: access.User, containing=None, modified_since=None, filters=None, covers=None, within=None, per_facet: int = 12):
     """For each facet, the values present among the matching records, each with how many records
     carry it, most first. A facet's own filter does not narrow its own counts, so the other
     values in a chosen facet stay visible."""
     out = {}
     for name in FACETS:
-        where, params = _search_where(user, containing, modified_since, filters, skip=name, covers=covers)
+        where, params = _search_where(user, containing, modified_since, filters, skip=name, covers=covers, within=within)
         if name in _FACET_SET:  # one record counts once for each of its values
             value = _FACET_SET[name]
             rows = conn.execute(

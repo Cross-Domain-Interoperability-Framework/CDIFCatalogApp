@@ -16,11 +16,12 @@ An early prototype. Built: the `CoreDiscovery` submission form (draft saving, OR
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
 web folders, sitemaps, CSW catalogues, OAI-PMH repositories, STAC catalogues and DCAT catalogues, and from uploaded files, with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
-the signed-in user; a landing page, a list of records with a plain word search, and a harvest
+the signed-in user; a landing page, a search page (ranked word search, facets over source,
+publisher, profile, keyword and kind, a date-range filter and a map to search by area), and a harvest
 page for admins (`web/src/pages.jsx`). The dry run (plan day 9) was done by script; its findings are in
 `docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
 a CKAN harvester, API tokens, mappings into CDIF, publishing
-of submitted records, search, serving CSW, OGC API Records and a sitemap of the catalog's own records. Do not start those without being asked.
+of submitted records, the geologic-age search range, the designed search page, serving CSW, OGC API Records and a sitemap of the catalog's own records. Do not start those without being asked.
 
 ## Commands
 
@@ -157,6 +158,22 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   in `_search_where` adds the overlap; a record with no span is excluded once a window is set.
   These are `STORED`, so changing the function does not recompute them: drop the columns (and the
   `records_coverage` index) and let `SCHEMA` rebuild them.
+- **The map filter reads a generated `bbox` geometry column, and needs PostGIS.** `SCHEMA` runs
+  `CREATE EXTENSION IF NOT EXISTS postgis` first; the dev `db` service and CI's Postgres service
+  are the `postgis/postgis:17-3.5` image (plain `postgres` lacks the extension, so both were
+  changed together), and Render's managed database provides it, enabled by the same statement at
+  startup. `bbox` is built by the immutable `cdif_bbox(text)` function from the first
+  `schema:spatialCoverage`'s `schema:geo` `schema:box` (a schema.org GeoShape box, `"lat lon lat
+  lon"`, lower corner then upper; `least`/`greatest` sort the corners, so either order works). Like
+  `cdif_date_bound` it is `plpgsql` with `EXCEPTION WHEN others THEN RETURN NULL`, so a bad box
+  cannot fail a save; points, lines and polygons are not read, so those records get no geometry.
+  `within=(west, south, east, north)` in `_search_where` adds `r.bbox && ST_MakeEnvelope(...,
+  4326)` (an index-assisted overlap over the `records_bbox` GiST index); a record with no area is
+  excluded once a box is set. The column is `STORED` (drop it and the index to recompute). The
+  browser sends `bbox=west,south,east,north`; `outbound._bbox` rejects a box that is not four
+  numbers, is out of range, or runs backwards. The map (`web/src/MapFilter.jsx`, vanilla Leaflet)
+  can show past the edges of the world, so it **clamps** a drawn box to -180..180 / -90..90 before
+  sending it, or the server rejects it.
 - **Search facets are counted by `store.facet_counts`, each over the query minus its own
   filter** (`_search_where(..., skip=name)`), so a chosen facet still shows its other values.
   There are two kinds. **Scalar facets** (`_FACET_VALUE`: source, publisher, profile) give a

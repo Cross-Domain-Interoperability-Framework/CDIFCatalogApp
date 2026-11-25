@@ -129,21 +129,40 @@ def _date(value: str | None, which: str):
         raise HTTPException(422, f"{which} must be a date like 2020-01-31.")
 
 
+def _bbox(value: str | None):
+    """A `west,south,east,north` box as four floats, or None. Longitudes in -180..180, latitudes
+    in -90..90, west on or before east and south on or before north."""
+    if not value or not value.strip():
+        return None
+    parts = value.split(",")
+    if len(parts) != 4:
+        raise HTTPException(422, "bbox must be four numbers: west,south,east,north.")
+    try:
+        west, south, east, north = (float(p) for p in parts)
+    except ValueError:
+        raise HTTPException(422, "bbox must be four numbers: west,south,east,north.")
+    if not (-180 <= west <= 180 and -180 <= east <= 180 and -90 <= south <= 90 and -90 <= north <= 90):
+        raise HTTPException(422, "bbox longitudes must be in -180..180 and latitudes in -90..90.")
+    if west > east or south > north:
+        raise HTTPException(422, "bbox must be west,south,east,north, with west on or before east and south before north.")
+    return (west, south, east, north)
+
+
 @router.get("/api/records")
 def list_records(
     q: str | None = None, page: int = 1, sort: str | None = None,
     source: str | None = None, publisher: str | None = None, profile: str | None = None,
     keyword: str | None = None, kind: str | None = None,
-    start: str | None = None, end: str | None = None,
+    start: str | None = None, end: str | None = None, bbox: str | None = None,
     user: access.User = Depends(auth.current_user),
 ) -> dict:
     """Published records the requester may see, for the browse and search pages. `q` keeps those
     holding those words. `sort` is `relevance` (the usual order when there are words), `modified`
     (most recently changed first, the usual order when there are none) or `title`. `source`,
     `publisher`, `profile`, `keyword` and `kind` each keep the records with that facet value.
-    `start` and `end` (ISO dates) keep the records whose own time span overlaps that window. The
-    answer carries the facet counts and the active `filters` for the current query so the page can
-    offer them."""
+    `start` and `end` (ISO dates) keep the records whose own time span overlaps that window; `bbox`
+    (`west,south,east,north`) keeps those whose own area overlaps that box. The answer carries the
+    facet counts and the active `filters` for the current query so the page can offer them."""
     if page < 1:
         raise HTTPException(422, "page starts at 1.")
     q = (q or "").strip()
@@ -156,18 +175,20 @@ def list_records(
     if after and before and after > before:
         raise HTTPException(422, "start must be on or before end.")
     covers = (after, before) if (after or before) else None
+    within = _bbox(bbox)
     with store.connect() as conn:
         total, rows = store.visible_records(
             conn, user, limit=LISTED_PER_PAGE, offset=(page - 1) * LISTED_PER_PAGE,
-            containing=q or None, order=sort, filters=filters, covers=covers,
+            containing=q or None, order=sort, filters=filters, covers=covers, within=within,
         )
-        facets = store.facet_counts(conn, user, containing=q or None, filters=filters, covers=covers)
+        facets = store.facet_counts(conn, user, containing=q or None, filters=filters, covers=covers, within=within)
     return {
         "total": total,
         "page": page,
         "sort": sort,
         "filters": filters,
         "covers": {"start": after.isoformat() if after else None, "end": before.isoformat() if before else None} if covers else None,
+        "bbox": list(within) if within else None,
         "facets": facets,
         "pages": max(1, -(-total // LISTED_PER_PAGE)),
         "records": [

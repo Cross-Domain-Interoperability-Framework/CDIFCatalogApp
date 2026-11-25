@@ -290,3 +290,31 @@ def test_search_filters_by_the_time_a_record_covers(catalog):
     # a date that is not a date, and a backwards window, are refused
     assert catalog.get("/api/records", params={"q": mark, "start": "soon"}).status_code == 422
     assert catalog.get("/api/records", params={"q": mark, "start": "2010-01-01", "end": "2000-01-01"}).status_code == 422
+
+
+def _place(box):  # a schema.org GeoShape box, "lat lon lat lon" (lower corner then upper)
+    return [{"@type": ["schema:Place"], "schema:geo": {"@type": ["schema:GeoShape"], "schema:box": box}}]
+
+
+def test_search_filters_by_the_area_a_record_covers(catalog):
+    mark = "bb" + uuid4().hex[:8]
+    oz = catalog.add(MINIMAL, **{"schema:name": f"{mark} oz", "schema:spatialCoverage": _place("-35 114 -29 118")})
+    eu = catalog.add(MINIMAL, **{"schema:name": f"{mark} eu", "schema:spatialCoverage": _place("45 2 50 8")})
+    nowhere = catalog.add(MINIMAL, **{"schema:name": f"{mark} nowhere"})  # no area
+
+    # a box over Australia keeps only the record whose area overlaps it; bbox is west,south,east,north
+    oz_box = catalog.get("/api/records", params={"q": mark, "bbox": "110,-45,155,-10"}).json()
+    assert {r["id"] for r in oz_box["records"]} == {oz}
+    assert oz_box["bbox"] == [110.0, -45.0, 155.0, -10.0]
+    # a box over Europe keeps only the European record
+    assert {r["id"] for r in catalog.get("/api/records", params={"q": mark, "bbox": "-10,35,30,60"}).json()["records"]} == {eu}
+
+    # a record with no area is left out once a box is set, but shown without one
+    worldwide = {r["id"] for r in catalog.get("/api/records", params={"q": mark, "bbox": "-180,-90,180,90"}).json()["records"]}
+    assert worldwide == {oz, eu} and nowhere not in worldwide
+    assert nowhere in {r["id"] for r in catalog.get("/api/records", params={"q": mark}).json()["records"]}
+
+    # a box that is not four numbers, out of range, or backwards is refused
+    assert catalog.get("/api/records", params={"q": mark, "bbox": "1,2,3"}).status_code == 422
+    assert catalog.get("/api/records", params={"q": mark, "bbox": "0,0,200,0"}).status_code == 422
+    assert catalog.get("/api/records", params={"q": mark, "bbox": "30,60,-10,35"}).status_code == 422
