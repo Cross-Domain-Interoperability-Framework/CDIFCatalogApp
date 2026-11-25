@@ -3,6 +3,7 @@ skips, without one. Records are written straight into the table and removed afte
 import datetime
 import json
 import os
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from uuid import uuid4
 
@@ -290,6 +291,34 @@ def test_search_filters_by_the_time_a_record_covers(catalog):
     # a date that is not a date, and a backwards window, are refused
     assert catalog.get("/api/records", params={"q": mark, "start": "soon"}).status_code == 422
     assert catalog.get("/api/records", params={"q": mark, "start": "2010-01-01", "end": "2000-01-01"}).status_code == 422
+
+
+SM = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
+
+
+def test_the_sitemap_lists_every_published_record_with_its_date(catalog):
+    shown = catalog.add(MINIMAL)
+    hidden = [catalog.add(MINIMAL, status="invalid"), catalog.add(MINIMAL, status="withdrawn", organisation="org-a")]
+
+    # the index points at one or more child sitemaps, each a /sitemap/{n}.xml carrying a lastmod
+    index = catalog.get("/sitemap.xml")
+    assert index.headers["content-type"].startswith("application/xml")
+    children = ET.fromstring(index.text).findall(f"{SM}sitemap")
+    assert f"{BASE}/sitemap/1.xml" in {c.find(f"{SM}loc").text for c in children}
+    assert all(c.find(f"{SM}lastmod").text for c in children)
+
+    # the first child lists each published, visible record's address with its last-modified date
+    page = catalog.get("/sitemap/1.xml")
+    assert page.headers["content-type"].startswith("application/xml")
+    urls = ET.fromstring(page.text).findall(f"{SM}url")
+    by_loc = {u.find(f"{SM}loc").text: u for u in urls}
+    assert f"{BASE}/records/{shown}" in by_loc
+    assert by_loc[f"{BASE}/records/{shown}"].find(f"{SM}lastmod").text  # has a lastmod
+    # nothing unpublished is listed
+    assert not {f"{BASE}/records/{h}" for h in hidden} & set(by_loc)
+
+    # a page past the end is not found
+    assert catalog.get("/sitemap/9999.xml").status_code == 404
 
 
 def _place(box):  # a schema.org GeoShape box, "lat lon lat lon" (lower corner then upper)

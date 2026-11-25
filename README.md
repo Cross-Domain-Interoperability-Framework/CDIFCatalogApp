@@ -72,7 +72,7 @@ browser ── web (React + JSON Forms, port 5173) ── /api ──> api (Fast
                                                              │                            ▲
                                                              └──> ROR, ORCID, DataCite,   │
                                                                   Crossref                │
-harvesters ── /catalog.ttl, /records/{id} ──────────────────> api        worker ──────────┘
+harvesters ── /catalog.ttl, /records/{id}, /sitemap.xml ─────> api        worker ──────────┘
                                                                            └──> harvest sources
 ```
 
@@ -147,7 +147,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `app/harvest/api.py` | `/api/harvest/…`: register sources, start, stop and read runs. |
 | `app/dcat.py` | CDIF records as DCAT-AP 3 and GeoDCAT-AP 3. |
 | `app/mappings/cdif-to-dcat.tsv` | Which CDIF property becomes which DCAT property, and which are lost. |
-| `app/outbound.py` | `/catalog.{ttl,jsonld,xml}` and `/records/{id}`: the catalog feed and the record address. |
+| `app/outbound.py` | `/catalog.{ttl,jsonld,xml}`, `/records/{id}` and `/sitemap.xml`: the catalog feed, the record address, and the sitemap of our own records. |
 | `app/messages/CoreDiscovery.json` | Each rule message from the profile's SHACL rules, rewritten in plain words. |
 | `app/lookup.py` | `/api/lookup/…`: searches ROR and ORCID, reads a DOI from DataCite or Crossref, and maps each answer to the shapes the form uses. |
 | `app/validate.py` | `/api/validate`: completes a form document into a record, checks it against the schema and the rules, and turns the results into findings that each name a field. |
@@ -220,6 +220,7 @@ harvesters ── /catalog.ttl, /records/{id} ───────────�
 | `POST /api/harvest/jobs/{id}/retry` | Queue a run that looks again at only the records that failed in this one. |
 | `GET /catalog.{ttl,jsonld,xml}` | The DCAT catalog feed. Parameters: `page`, `modified_since`, `profiles` (`dcat_ap` or `geodcat_ap`). |
 | `GET /records/{id}` | A published record, in the format the `Accept` header asks for, or `?format=` one of `html`, `cdif`, `dcat-jsonld`, `dcat-ttl`. |
+| `GET /sitemap.xml`, `GET /sitemap/{page}.xml` | The sitemap of our own records: an index pointing to child sitemaps (50,000 records each), which list every published record's address and its last-modified date, so a harvester fetches only what changed. |
 
 Settings read from the environment: `ORCID_BASE`, `ORCID_CLIENT_ID`, `ORCID_CLIENT_SECRET` and
 `ADMIN_ORCIDS` for sign-in (see `docs/setup-sandboxes.md`), `PUBLIC_URL` (the address written into the feed

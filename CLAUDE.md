@@ -17,11 +17,12 @@ DOI pre-fill, server validation with a report, submit, plain-language wording); 
 web folders, sitemaps, CSW catalogues, OAI-PMH repositories, STAC catalogues and DCAT catalogues, and from uploaded files, with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
 the signed-in user; a landing page, a search page (ranked word search, facets over source,
-publisher, profile, keyword and kind, a date-range filter and a map to search by area), and a harvest
+publisher, profile, keyword and kind, a date-range filter and a map to search by area), a sitemap
+of our own records, and a harvest
 page for admins (`web/src/pages.jsx`). The dry run (plan day 9) was done by script; its findings are in
 `docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
 a CKAN harvester, API tokens, mappings into CDIF, publishing
-of submitted records, the geologic-age search range, the designed search page, serving CSW, OGC API Records and a sitemap of the catalog's own records. Do not start those without being asked.
+of submitted records, the geologic-age search range, the designed search page, serving CSW and OGC API Records. Do not start those without being asked.
 
 ## Commands
 
@@ -191,6 +192,15 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   shown as stored (a kind like `geographicDataset` is not yet mapped to a plain-language label).
   `visible_records` and `facet_counts` share `_search_where`; the record table is aliased `r`
   there and `harvest_sources` is joined only for the source facet.
+- **The sitemap of our own records is an index with paged children** (`outbound.py`):
+  `/sitemap.xml` is a `sitemapindex` pointing to `/sitemap/{page}.xml` child `urlset`s, 50,000
+  records each (the sitemaps.org limit). Each child lists every published, visible record's
+  `/records/{id}` address with its `changed_at` as `lastmod`, newest first, so a harvester fetches
+  only what changed. It is requester-scoped like the feed (`Depends(auth.current_user)`), so it
+  lists only what the requester may see. `store.visible_record_stamps` and `visible_record_pages`
+  reuse `_search_where` for the visibility clause and do not read the record body. Page 1 may be
+  legitimately empty; a later page past the end is a 404. `/sitemap` must be in `web/vite.config.js`'s
+  proxy list to reach the API in dev (a proxy change needs the web image rebuilt).
 - **A CDIF record is validated against the profile its own catalog record declares**
   (`validate.profile_for`), not against a setting. The source's `profile` setting is only the
   fallback for a record that declares nothing we hold a profile for.

@@ -106,6 +106,50 @@ def catalog(
     return Response(dcat.serialize(graph, fmt), media_type=dcat.MEDIA[fmt])
 
 
+# ---- the sitemap of our own records ------------------------------------------------------------
+
+# The sitemaps.org limit is 50,000 URLs (and 50 MB) per file, so the sitemap is an index pointing
+# to child sitemaps of this many records each. Harvesters read each record's lastmod to fetch only
+# what changed.
+SITEMAP_PER_PAGE = 50_000
+
+
+def _loc_lastmod(tag: str, loc: str, lastmod) -> str:
+    return f"<{tag}><loc>{html.escape(loc)}</loc><lastmod>{lastmod.isoformat()}</lastmod></{tag}>"
+
+
+@router.get("/sitemap.xml")
+def sitemap_index(request: Request, user: access.User = Depends(auth.current_user)) -> Response:
+    base = public_url(request)
+    with store.connect() as conn:
+        pages = store.visible_record_pages(conn, user, SITEMAP_PER_PAGE)
+    entries = "".join(_loc_lastmod("sitemap", f"{base}/sitemap/{row['page']}.xml", row["lastmod"]) for row in pages)
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{entries}</sitemapindex>"
+    )
+    return Response(body, media_type="application/xml")
+
+
+@router.get("/sitemap/{page}.xml")
+def sitemap_page(page: int, request: Request, user: access.User = Depends(auth.current_user)) -> Response:
+    if page < 1:
+        raise HTTPException(404, "No such sitemap page.")
+    base = public_url(request)
+    with store.connect() as conn:
+        _, rows = store.visible_record_stamps(conn, user, SITEMAP_PER_PAGE, (page - 1) * SITEMAP_PER_PAGE)
+    if not rows and page > 1:  # page 1 may be legitimately empty; a later page past the end is not
+        raise HTTPException(404, "No such sitemap page.")
+    urls = "".join(_loc_lastmod("url", f"{base}/records/{row['id']}", row["changed_at"]) for row in rows)
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{urls}</urlset>"
+    )
+    return Response(body, media_type="application/xml")
+
+
 # ---- the list the web pages show ---------------------------------------------------------------
 
 LISTED_PER_PAGE = 20
