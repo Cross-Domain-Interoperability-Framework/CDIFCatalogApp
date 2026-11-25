@@ -241,6 +241,7 @@ def list_records(
                 "name": _words(r["published"].get("schema:name")) or "Untitled record",
                 "description": _words(r["published"].get("schema:description"))[:300],
                 "changed": r["changed_at"],
+                "bbox": [r["minx"], r["miny"], r["maxx"], r["maxy"]] if r["minx"] is not None else None,
             }
             for r in rows
         ],

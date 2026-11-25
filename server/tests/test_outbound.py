@@ -335,13 +335,17 @@ def test_search_filters_by_the_area_a_record_covers(catalog):
     oz_box = catalog.get("/api/records", params={"q": mark, "bbox": "110,-45,155,-10"}).json()
     assert {r["id"] for r in oz_box["records"]} == {oz}
     assert oz_box["bbox"] == [110.0, -45.0, 155.0, -10.0]
+    # each result carries its own extent (west, south, east, north), for the map to draw
+    assert oz_box["records"][0]["bbox"] == [114.0, -35.0, 118.0, -29.0]
     # a box over Europe keeps only the European record
     assert {r["id"] for r in catalog.get("/api/records", params={"q": mark, "bbox": "-10,35,30,60"}).json()["records"]} == {eu}
 
     # a record with no area is left out once a box is set, but shown without one
     worldwide = {r["id"] for r in catalog.get("/api/records", params={"q": mark, "bbox": "-180,-90,180,90"}).json()["records"]}
     assert worldwide == {oz, eu} and nowhere not in worldwide
-    assert nowhere in {r["id"] for r in catalog.get("/api/records", params={"q": mark}).json()["records"]}
+    all_three = catalog.get("/api/records", params={"q": mark}).json()["records"]
+    assert nowhere in {r["id"] for r in all_three}
+    assert next(r["bbox"] for r in all_three if r["id"] == nowhere) is None  # no area, no extent
 
     # a box that is not four numbers, out of range, or backwards is refused
     assert catalog.get("/api/records", params={"q": mark, "bbox": "1,2,3"}).status_code == 422

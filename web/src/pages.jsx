@@ -3,7 +3,7 @@
 // server only ever serves one file. The form itself is App.jsx.
 import { useEffect, useRef, useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardActions, CardContent, Chip, Container, CssBaseline, Link, MenuItem, Paper, Stack,
+  Alert, Box, Button, Card, CardActions, CardContent, Chip, Container, CssBaseline, Divider, Link, MenuItem, Paper, Stack,
   TextField, ThemeProvider, Typography,
 } from '@mui/material';
 import AddCircleOutline from '@mui/icons-material/AddCircleOutline';
@@ -36,10 +36,10 @@ function useMe() {
 const whenOf = (iso) => new Date(iso).toLocaleDateString([], { dateStyle: 'medium' });
 
 // The frame every page but the form shares: the catalog's name, which leads home, and the account.
-export function Page({ title, children }) {
+export function Page({ title, children, maxWidth = 'md' }) {
   return (
     <ThemeProvider theme={theme}>
-      <Container maxWidth="md" sx={{ py: 2 }}>
+      <Container maxWidth={maxWidth} sx={{ py: 2 }}>
         <CssBaseline />
         <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', minHeight: 32 }}>
           <Link href="#/" underline="hover" variant="body2">CDIF Catalog</Link>
@@ -128,6 +128,7 @@ export function Records({ searching }) {
   const [query, setQuery] = useState({ q: '', page: 1, sort: 'relevance', source: '', publisher: '', profile: '', keyword: '', kind: '', start: '', end: '', bbox: '' });
   const [found, setFound] = useState(null);
   const [error, setError] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
 
   useEffect(() => {
     let current = true;
@@ -155,8 +156,45 @@ export function Records({ searching }) {
     setQuery((prev) => ({ ...prev, sort: value, page: 1 }));
   };
 
+  const clearDates = () => setQuery((prev) => ({ ...prev, start: '', end: '', page: 1 }));
+  const clearArea = () => setQuery((prev) => ({ ...prev, bbox: '', page: 1 }));
+
+  // the filters now in force, each with the words to show and the way to drop it
+  const applied = [
+    ...Object.keys(FACET_LABELS).filter((k) => query[k]).map((k) => {
+      const chosen = (found?.facets?.[k] || []).find((v) => v.value === query[k]);
+      return { key: k, label: `${FACET_LABELS[k]}: ${chosen ? chosen.label : query[k]}`, onDelete: () => toggleFacet(k, query[k]) };
+    }),
+    ...((query.start || query.end) ? [{
+      key: 'dates', label: `Covering ${query.start || '…'} to ${query.end || '…'}`, onDelete: clearDates,
+    }] : []),
+    ...(query.bbox ? [{ key: 'bbox', label: 'A drawn area', onDelete: clearArea }] : []),
+  ];
+
+  const facetGroup = (name) => {
+    const values = (found?.facets?.[name]) || [];
+    if (values.length < 2 && !query[name]) return null;
+    return (
+      <Box key={name}>
+        <Typography variant="overline" color="text.secondary">{FACET_LABELS[name]}</Typography>
+        <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+          {values.map((v) => (
+            <Chip
+              key={v.value}
+              size="small"
+              label={`${v.label} (${v.count})`}
+              variant={query[name] === v.value ? 'filled' : 'outlined'}
+              color={query[name] === v.value ? 'primary' : 'default'}
+              onClick={() => toggleFacet(name, v.value)}
+            />
+          ))}
+        </Stack>
+      </Box>
+    );
+  };
+
   return (
-    <Page title={searching ? 'Search the catalog' : 'Records in the catalog'}>
+    <Page title={searching ? 'Search the catalog' : 'Records in the catalog'} maxWidth="lg">
       <Stack component="form" onSubmit={search} direction="row" spacing={1} sx={{ mb: 2 }}>
         <TextField
           label="Words in the title, description or keywords"
@@ -165,76 +203,87 @@ export function Records({ searching }) {
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        <TextField select label="Order" value={sort} onChange={(e) => reorder(e.target.value)} sx={{ minWidth: 190 }}>
-          <MenuItem value="relevance">Best match</MenuItem>
-          <MenuItem value="modified">Most recently changed</MenuItem>
-          <MenuItem value="title">Title</MenuItem>
-        </TextField>
         <Button type="submit" variant="contained">Search</Button>
       </Stack>
-      <Stack direction="row" spacing={1} sx={{ mb: 2, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
-        <Typography variant="body2" color="text.secondary">Data covering</Typography>
-        <TextField type="date" label="from" size="small" InputLabelProps={{ shrink: true }} value={query.start} onChange={(e) => setDate('start', e.target.value)} sx={{ width: 170 }} />
-        <Typography variant="body2" color="text.secondary">to</Typography>
-        <TextField type="date" label="to" size="small" InputLabelProps={{ shrink: true }} value={query.end} onChange={(e) => setDate('end', e.target.value)} sx={{ width: 170 }} />
-        {(query.start || query.end) && (
-          <Button size="small" onClick={() => setQuery((prev) => ({ ...prev, start: '', end: '', page: 1 }))}>Clear dates</Button>
-        )}
+      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} alignItems="flex-start">
+        <Stack
+          spacing={2}
+          sx={{ width: { xs: '100%', md: 280 }, flexShrink: 0, position: { md: 'sticky' }, top: { md: 16 } }}
+        >
+          <Box>
+            <Typography variant="overline" color="text.secondary">Data covering</Typography>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <TextField type="date" label="from" size="small" InputLabelProps={{ shrink: true }} value={query.start} onChange={(e) => setDate('start', e.target.value)} fullWidth />
+              <TextField type="date" label="to" size="small" InputLabelProps={{ shrink: true }} value={query.end} onChange={(e) => setDate('end', e.target.value)} fullWidth />
+            </Stack>
+          </Box>
+          {found?.facets && Object.keys(FACET_LABELS).map(facetGroup).filter(Boolean).reduce(
+            (out, group, i) => out.concat(i ? [<Divider key={`d${i}`} flexItem />, group] : [group]), [],
+          )}
+        </Stack>
+        <Box sx={{ flex: 1, minWidth: 0, width: '100%' }}>
+          <MapFilter
+            value={query.bbox}
+            onChange={(bbox) => setQuery((prev) => ({ ...prev, bbox, page: 1 }))}
+            results={found?.records || []}
+            highlightId={hoveredId}
+          />
+          {found && (
+            <>
+              <Stack direction="row" spacing={1} sx={{ mt: 2, mb: 1, alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}>
+                <Typography variant="body2" color="text.secondary" data-testid="record-count" sx={{ flex: 1 }}>
+                  {found.total === 0
+                    ? (query.q ? `No record holds "${query.q}".` : 'The catalog holds no published records yet.')
+                    : `${found.total} ${found.total === 1 ? 'record' : 'records'}${query.q ? ` holding "${query.q}"` : ''}`}
+                </Typography>
+                <TextField select label="Order" size="small" value={sort} onChange={(e) => reorder(e.target.value)} sx={{ minWidth: 190 }}>
+                  <MenuItem value="relevance">Best match</MenuItem>
+                  <MenuItem value="modified">Most recently changed</MenuItem>
+                  <MenuItem value="title">Title</MenuItem>
+                </TextField>
+              </Stack>
+              {applied.length > 0 && (
+                <Stack direction="row" spacing={0.5} sx={{ mb: 1, flexWrap: 'wrap', rowGap: 0.5, alignItems: 'center' }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ mr: 0.5 }}>Filters:</Typography>
+                  {applied.map((f) => <Chip key={f.key} size="small" label={f.label} onDelete={f.onDelete} />)}
+                </Stack>
+              )}
+              <Stack spacing={1} sx={{ mb: 2 }}>
+                {found.records.map((r) => (
+                  <Paper
+                    key={r.id}
+                    variant="outlined"
+                    onMouseEnter={() => setHoveredId(r.id)}
+                    onMouseLeave={() => setHoveredId(null)}
+                    sx={{
+                      p: 1.5, transition: 'border-color .1s',
+                      borderColor: hoveredId === r.id ? 'warning.main' : undefined,
+                    }}
+                  >
+                    <Link href={`/records/${r.id}`} underline="hover" sx={{ fontWeight: 600 }}>{r.name}</Link>
+                    {r.description && r.description !== r.name && (
+                      <Typography variant="body2" sx={{ mt: 0.25 }}>
+                        {r.description}{r.description.length >= 300 ? '…' : ''}
+                      </Typography>
+                    )}
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>
+                      {r.bbox ? 'Has a place · ' : ''}Changed in the catalog on {whenOf(r.changed)}
+                    </Typography>
+                  </Paper>
+                ))}
+              </Stack>
+              {found.pages > 1 && (
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'center' }}>
+                  <Button disabled={query.page <= 1} onClick={() => setQuery({ ...query, page: query.page - 1 })}>Previous</Button>
+                  <Typography variant="body2">Page {found.page} of {found.pages}</Typography>
+                  <Button disabled={query.page >= found.pages} onClick={() => setQuery({ ...query, page: query.page + 1 })}>Next</Button>
+                </Stack>
+              )}
+            </>
+          )}
+        </Box>
       </Stack>
-      <MapFilter value={query.bbox} onChange={(bbox) => setQuery((prev) => ({ ...prev, bbox, page: 1 }))} />
-      {error && <Alert severity="error">{error}</Alert>}
-      {found && (
-        <>
-          <Typography variant="body2" color="text.secondary" data-testid="record-count">
-            {found.total === 0
-              ? (query.q ? `No record holds "${query.q}".` : 'The catalog holds no published records yet.')
-              : `${found.total} ${found.total === 1 ? 'record' : 'records'}${query.q ? ` holding "${query.q}"` : ''}`}
-          </Typography>
-          {found.facets && (
-            <Stack spacing={0.5} sx={{ mt: 1 }}>
-              {Object.entries(FACET_LABELS).map(([name, label]) => {
-                const values = found.facets[name] || [];
-                if (values.length < 2 && !query[name]) return null;
-                return (
-                  <Stack key={name} direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5, alignItems: 'baseline' }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ width: 96, flexShrink: 0 }}>{label}</Typography>
-                    {values.map((v) => (
-                      <Chip
-                        key={v.value}
-                        size="small"
-                        label={`${v.label} (${v.count})`}
-                        variant={query[name] === v.value ? 'filled' : 'outlined'}
-                        color={query[name] === v.value ? 'primary' : 'default'}
-                        onClick={() => toggleFacet(name, v.value)}
-                      />
-                    ))}
-                  </Stack>
-                );
-              })}
-            </Stack>
-          )}
-          <Stack spacing={1} sx={{ my: 1 }}>
-            {found.records.map((r) => (
-              <Paper key={r.id} variant="outlined" sx={{ p: 1.5 }}>
-                <Link href={`/records/${r.id}`} underline="hover" sx={{ fontWeight: 600 }}>{r.name}</Link>
-                {r.description && r.description !== r.name && (
-                  <Typography variant="body2" sx={{ mt: 0.25 }}>
-                    {r.description}{r.description.length >= 300 ? '…' : ''}
-                  </Typography>
-                )}
-                <Typography variant="caption" color="text.secondary">Changed in the catalog on {whenOf(r.changed)}</Typography>
-              </Paper>
-            ))}
-          </Stack>
-          {found.pages > 1 && (
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'center' }}>
-              <Button disabled={query.page <= 1} onClick={() => setQuery({ ...query, page: query.page - 1 })}>Previous</Button>
-              <Typography variant="body2">Page {found.page} of {found.pages}</Typography>
-              <Button disabled={query.page >= found.pages} onClick={() => setQuery({ ...query, page: query.page + 1 })}>Next</Button>
-            </Stack>
-          )}
-        </>
-      )}
     </Page>
   );
 }

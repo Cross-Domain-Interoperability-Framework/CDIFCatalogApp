@@ -337,7 +337,9 @@ def visible_records(
         by = "lower(r.published->>'schema:name'), r.id"
     total = conn.execute(f"SELECT count(*) AS n FROM records r WHERE {where}", params).fetchone()["n"]
     rows = conn.execute(
-        f"SELECT r.id, r.published, r.changed_at FROM records r WHERE {where} ORDER BY {by} LIMIT %s OFFSET %s",
+        "SELECT r.id, r.published, r.changed_at, "
+        "ST_XMin(r.bbox) AS minx, ST_YMin(r.bbox) AS miny, ST_XMax(r.bbox) AS maxx, ST_YMax(r.bbox) AS maxy "
+        f"FROM records r WHERE {where} ORDER BY {by} LIMIT %s OFFSET %s",
         params + ranked + [limit, offset],
     ).fetchall()
     return total, rows

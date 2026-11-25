@@ -88,13 +88,17 @@ that record's page. **Search catalog** is the same list with a box for words: it
 records whose title, keywords, creators, measured variables or description hold what you type,
 and shows the best match first. A word matches whatever its ending, so "ages" finds "age"; put
 "two words" in quotes to keep them together, and -word to leave a word out. The list can be
-ordered by best match, by what changed most recently, or by title. Below the box, chips narrow
-the results by where a record came from, who published it, how detailed it is, and its keywords
-and kind; the number on each chip is how many records it would leave. Draw a box on the map to
-keep only records whose own area overlaps it, and clear it to drop that filter. The "Data
-covering" dates keep only records
+ordered by best match, by what changed most recently, or by title. Down the left are the filters:
+chips that narrow the results by where a record came from, who published it, how detailed it is,
+and its keywords and kind (the number on each chip is how many records it would leave), and the
+"Data covering" dates, which keep only records
 whose own time span overlaps that window; a record that gives no time span is left out while a
 date is set.
+
+The map beside the results shows the area each record on the page covers; point at a record in
+the list and its area lifts on the map. Draw a box on the map to keep only records whose own area
+overlaps it. The filters in force are listed as chips above the results, each with a cross to drop
+it.
 
 Programs reach records through the catalog feed and through each record's own address.
 
