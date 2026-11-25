@@ -120,17 +120,28 @@ def _words(value) -> str:
     return str(value or "")
 
 
+def _date(value: str | None, which: str):
+    if not value or not value.strip():
+        return None
+    try:
+        return datetime.date.fromisoformat(value.strip())
+    except ValueError:
+        raise HTTPException(422, f"{which} must be a date like 2020-01-31.")
+
+
 @router.get("/api/records")
 def list_records(
     q: str | None = None, page: int = 1, sort: str | None = None,
     source: str | None = None, publisher: str | None = None, profile: str | None = None,
+    start: str | None = None, end: str | None = None,
     user: access.User = Depends(auth.current_user),
 ) -> dict:
     """Published records the requester may see, for the browse and search pages. `q` keeps those
     holding those words. `sort` is `relevance` (the usual order when there are words), `modified`
     (most recently changed first, the usual order when there are none) or `title`. `source`,
-    `publisher` and `profile` each keep the records with that facet value; the answer carries the
-    facet counts for the current query so the page can offer them."""
+    `publisher` and `profile` each keep the records with that facet value. `start` and `end` (ISO
+    dates) keep the records whose own time span overlaps that window. The answer carries the facet
+    counts and the active `filters` for the current query so the page can offer them."""
     if page < 1:
         raise HTTPException(422, "page starts at 1.")
     q = (q or "").strip()
@@ -138,17 +149,22 @@ def list_records(
     if sort not in store.ORDERS:
         raise HTTPException(422, "sort must be one of: " + ", ".join(store.ORDERS))
     filters = {k: v.strip() for k, v in {"source": source, "publisher": publisher, "profile": profile}.items() if v and v.strip()}
+    after, before = _date(start, "start"), _date(end, "end")
+    if after and before and after > before:
+        raise HTTPException(422, "start must be on or before end.")
+    covers = (after, before) if (after or before) else None
     with store.connect() as conn:
         total, rows = store.visible_records(
             conn, user, limit=LISTED_PER_PAGE, offset=(page - 1) * LISTED_PER_PAGE,
-            containing=q or None, order=sort, filters=filters,
+            containing=q or None, order=sort, filters=filters, covers=covers,
         )
-        facets = store.facet_counts(conn, user, containing=q or None, filters=filters)
+        facets = store.facet_counts(conn, user, containing=q or None, filters=filters, covers=covers)
     return {
         "total": total,
         "page": page,
         "sort": sort,
         "filters": filters,
+        "covers": {"start": after.isoformat() if after else None, "end": before.isoformat() if before else None} if covers else None,
         "facets": facets,
         "pages": max(1, -(-total // LISTED_PER_PAGE)),
         "records": [

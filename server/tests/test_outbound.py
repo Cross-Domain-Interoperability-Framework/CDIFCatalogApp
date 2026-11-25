@@ -232,3 +232,28 @@ def test_search_offers_facets_and_filters_by_them(catalog):
 
     # a value nothing carries simply finds nothing
     assert catalog.get("/api/records", params={"q": mark, "publisher": "nobody at all"}).json()["total"] == 0
+
+
+def test_search_filters_by_the_time_a_record_covers(catalog):
+    mark = "dd" + uuid4().hex[:8]
+    old = catalog.add(MINIMAL, **{"schema:name": f"{mark} old", "schema:temporalCoverage": ["1990-01-01/1995-12-31"]})
+    mid = catalog.add(MINIMAL, **{"schema:name": f"{mark} mid", "schema:temporalCoverage": ["2005-06-01/2010-06-01"]})
+    year = catalog.add(MINIMAL, **{"schema:name": f"{mark} year", "schema:temporalCoverage": ["2008"]})
+    undated = catalog.add(MINIMAL, **{"schema:name": f"{mark} undated"})
+
+    # a window overlapping only the spans that reach into 2008
+    within = catalog.get("/api/records", params={"q": mark, "start": "2008-01-01", "end": "2008-12-31"}).json()
+    assert {r["id"] for r in within["records"]} == {mid, year}
+    assert within["covers"] == {"start": "2008-01-01", "end": "2008-12-31"}
+
+    # an end alone keeps the records whose span starts on or before it
+    assert {r["id"] for r in catalog.get("/api/records", params={"q": mark, "end": "2000-01-01"}).json()["records"]} == {old}
+
+    # a record with no time span is left out once a window is set, but shown without one
+    windowed = {r["id"] for r in catalog.get("/api/records", params={"q": mark, "start": "1900-01-01"}).json()["records"]}
+    assert undated not in windowed and {old, mid, year} <= windowed
+    assert undated in {r["id"] for r in catalog.get("/api/records", params={"q": mark}).json()["records"]}
+
+    # a date that is not a date, and a backwards window, are refused
+    assert catalog.get("/api/records", params={"q": mark, "start": "soon"}).status_code == 422
+    assert catalog.get("/api/records", params={"q": mark, "start": "2010-01-01", "end": "2000-01-01"}).status_code == 422
