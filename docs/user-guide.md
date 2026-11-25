@@ -108,6 +108,11 @@ The feed is written in DCAT, so another catalog can harvest this one from it. It
 records to a page; add `?page=2` for the next. Add `?modified_since=2026-11-01` to list only
 records changed since a date.
 
+**The sitemap** at http://127.0.0.1:5173/sitemap.xml lists every published record's address with
+the date it last changed, in the sitemaps.org form that search engines and schema.org harvesters
+read. It is an index pointing to one or more child sitemaps (`/sitemap/1.xml` and so on), so a
+harvester can fetch only the records that changed.
+
 **A record's address** looks like `http://127.0.0.1:5173/records/` followed by a long identifier.
 Copy one from the feed, from a line beginning `dcat:record`. Opened in a browser it shows a plain
 summary page. To get the record in another form, add one of these to the end of the address:

@@ -385,3 +385,28 @@ def visible_record(conn, user: access.User, record_id):
         "WHERE id = %s AND status = 'published' AND labels && %s",
         (record_id, access.user_labels(user)),
     ).fetchone()
+
+
+def visible_record_stamps(conn, user: access.User, limit: int, offset: int):
+    """(total, rows of id and changed_at) for published records the user may see, newest first.
+    Light enough for the sitemap: it does not read the record body."""
+    where, params = _search_where(user, None, None, None)
+    total = conn.execute(f"SELECT count(*) AS n FROM records r WHERE {where}", params).fetchone()["n"]
+    rows = conn.execute(
+        f"SELECT r.id, r.changed_at FROM records r WHERE {where} ORDER BY r.changed_at DESC, r.id LIMIT %s OFFSET %s",
+        params + [limit, offset],
+    ).fetchall()
+    return total, rows
+
+
+def visible_record_pages(conn, user: access.User, per_page: int):
+    """For the sitemap index: (page from 1, newest changed_at on that page) for each page of
+    `per_page` published records the user may see, newest page first. Empty when there are none."""
+    where, params = _search_where(user, None, None, None)
+    return conn.execute(
+        "SELECT bucket + 1 AS page, max(changed_at) AS lastmod FROM ("
+        "  SELECT changed_at, (row_number() OVER (ORDER BY changed_at DESC, id) - 1) / %s AS bucket"
+        f"  FROM records r WHERE {where}"
+        ") t GROUP BY bucket ORDER BY bucket",
+        [per_page] + params,
+    ).fetchall()
