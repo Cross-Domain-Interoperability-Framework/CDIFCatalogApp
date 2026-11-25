@@ -22,7 +22,7 @@ of our own records, and a harvest
 page for admins (`web/src/pages.jsx`). The dry run (plan day 9) was done by script; its findings are in
 `docs/form-inventory.md`. Not built: the scientist sessions (plan day 10),
 a CKAN harvester, API tokens, mappings into CDIF, publishing
-of submitted records, the geologic-age search range, the designed search page, serving CSW and OGC API Records. Do not start those without being asked.
+of submitted records, the geologic-age search range, serving CSW and OGC API Records. Do not start those without being asked.
 
 ## Commands
 
