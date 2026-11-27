@@ -289,6 +289,13 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
 - **A route that changes anything needs `Depends(auth.require(<permission>))`.** The harvest
   router applies it to every route at once. A test that needs a signed-in user overrides
   `auth.current_user` (see `as_admin` in `test_harvest.py`).
+- **A record that did not publish is read only through the admin harvest API.** The public
+  `/records/{id}` serves published records only (`store.visible_record`). `GET
+  /api/harvest/records/{id}` (admin-only, any status) returns a failed record's `received` text,
+  `received_format`, the `cdif` it became (`published` or `source_cdif`, null if it did not map)
+  and its `validation` findings, so the harvest page's "View" can show why it failed. The run's
+  errors carry the `record_id` for this. The form's copy flow (`web/src/App.jsx`) falls back from
+  `/records/{id}?format=cdif` to this endpoint, so a failed record with CDIF opens in the form.
 - **`ADMIN_ORCIDS` only ever adds the admins group, at sign-in.** Removing an iD from the setting
   does not demote anyone; that is an edit to `users.groups` in the database.
 - **ORCID refuses a return address containing `localhost`.** `PUBLIC_URL` therefore defaults to

@@ -3,7 +3,8 @@
 // server only ever serves one file. The form itself is App.jsx.
 import { useEffect, useRef, useState } from 'react';
 import {
-  Alert, Box, Button, Card, CardActions, CardContent, Chip, Container, CssBaseline, Divider, Link, MenuItem, Paper, Stack,
+  Alert, Box, Button, Card, CardActions, CardContent, Chip, Container, CssBaseline, Dialog, DialogActions,
+  DialogContent, DialogTitle, Divider, Link, MenuItem, Paper, Stack,
   TextField, ThemeProvider, Typography,
 } from '@mui/material';
 import AddCircleOutline from '@mui/icons-material/AddCircleOutline';
@@ -296,9 +297,68 @@ const OUTCOMES = [
 ];
 const RUNNING = ['new', 'running'];
 
+// A harvested record that did not publish, shown so an admin can see why: the problems found in
+// it (or, if it could not be read at all, a note), and the record as it was received. A record
+// that became CDIF can be opened in the form to be fixed.
+function FailedRecord({ recordId, onClose }) {
+  const [rec, setRec] = useState(null);
+  const [error, setError] = useState(null);
+  useEffect(() => {
+    api('GET', `/api/harvest/records/${recordId}`).then(setRec).catch((e) => setError(e.message));
+  }, [recordId]);
+  const findings = rec?.validation?.findings || [];
+  return (
+    <Dialog open onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>Why this record did not publish</DialogTitle>
+      <DialogContent dividers>
+        {error && <Alert severity="error">{error}</Alert>}
+        {rec && (
+          <Stack spacing={2}>
+            {findings.length > 0 ? (
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>What needs fixing</Typography>
+                <Box component="ul" sx={{ pl: 2.5, my: 0, typography: 'body2' }}>
+                  {findings.map((f, i) => (
+                    <li key={i}>
+                      {f.message}
+                      {f.where && <Typography variant="caption" color="text.secondary"> — {f.where}</Typography>}
+                    </li>
+                  ))}
+                </Box>
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                This record could not be read into the catalog's form. The reason is in the list of
+                problems; the record as received is below.
+              </Typography>
+            )}
+            <Box>
+              <Typography variant="subtitle2" gutterBottom>
+                As received{rec.received_format ? ` (${rec.received_format})` : ''}
+              </Typography>
+              <Box
+                component="pre"
+                sx={{ maxHeight: 320, overflow: 'auto', bgcolor: 'action.hover', p: 1, borderRadius: 1,
+                  fontSize: 12, whiteSpace: 'pre-wrap', wordBreak: 'break-word', m: 0 }}
+              >
+                {rec.received || '(nothing was stored)'}
+              </Box>
+            </Box>
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions>
+        {rec?.cdif && <Button href={`/?copy=${recordId}`}>Open in the form</Button>}
+        <Button onClick={onClose}>Close</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 function Run({ jobId, onDone }) {
   const [job, setJob] = useState(null);
   const [error, setError] = useState(null);
+  const [viewId, setViewId] = useState(null);
   const done = useRef(onDone);
   done.current = onDone;
 
@@ -332,11 +392,17 @@ function Run({ jobId, onDone }) {
           <summary>{job.errors.length} {job.errors.length === 1 ? 'problem' : 'problems'}</summary>
           <Box component="ul" sx={{ pl: 2.5, my: 0.5, typography: 'body2' }}>
             {job.errors.map((e, i) => (
-              <li key={i}>{e.identifier ? `${e.identifier}: ` : ''}{e.message}</li>
+              <li key={i}>
+                {e.identifier ? `${e.identifier}: ` : ''}{e.message}
+                {e.record_id && (
+                  <Button size="small" sx={{ ml: 0.5, py: 0 }} onClick={() => setViewId(e.record_id)}>View</Button>
+                )}
+              </li>
             ))}
           </Box>
         </details>
       )}
+      {viewId && <FailedRecord recordId={viewId} onClose={() => setViewId(null)} />}
     </Box>
   );
 }

@@ -159,11 +159,36 @@ def read_job(job_id: UUID) -> dict:
         if job is None:
             raise HTTPException(404, "No harvest job with that id.")
         errors = conn.execute(
-            "SELECT e.stage, e.message, e.created_at, o.identifier FROM harvest_errors e "
+            "SELECT e.stage, e.message, e.created_at, o.identifier, o.record_id FROM harvest_errors e "
             "LEFT JOIN harvest_objects o ON o.id = e.object_id WHERE e.job_id = %s ORDER BY e.created_at",
             (job_id,),
         ).fetchall()
         return {**job, "stats": run.stats(conn, job_id), "errors": errors}
+
+
+@router.get("/records/{record_id}")
+def read_harvested_record(record_id: UUID) -> dict:
+    """A harvested record that did not publish, for an admin to see why. Gives the text as it was
+    received and its format, the CDIF it became (null if it could not be mapped), the validation
+    findings (null if it never reached validation), and its status."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT id, status, source_identifier, received, received_format, source_cdif, "
+            "published, validation, profile FROM records WHERE id = %s",
+            (record_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(404, "No record with that id.")
+    return {
+        "id": str(row["id"]),
+        "status": row["status"],
+        "identifier": row["source_identifier"],
+        "received": row["received"],
+        "received_format": row["received_format"],
+        "cdif": row["published"] or row["source_cdif"],  # what would be published, if it mapped
+        "validation": row["validation"],
+        "profile": row["profile"],
+    }
 
 
 @router.post("/jobs/{job_id}/retry", status_code=201)

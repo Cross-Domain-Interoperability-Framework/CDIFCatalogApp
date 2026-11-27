@@ -118,11 +118,15 @@ export default function App() {
       let copy = null;
       if (COPY_ID) {
         const res = await fetch(`/records/${encodeURIComponent(COPY_ID)}?format=cdif`);
-        if (res.ok) {
-          copy = fitRecord(await res.json(), schema);
-        } else if (!cancelled) {
-          setCopied({ failed: true });
+        let cdif = res.ok ? await res.json() : null;
+        if (!cdif) {
+          // A record that did not publish is not served there, but an admin can read it, and the
+          // CDIF it became, through the harvest API, to open and fix here.
+          const held = await fetch(`/api/harvest/records/${encodeURIComponent(COPY_ID)}`);
+          if (held.ok) cdif = (await held.json()).cdif;
         }
+        if (cdif) copy = fitRecord(cdif, schema);
+        else if (!cancelled) setCopied({ failed: true });
       }
       if (copy) {
         document = copy;

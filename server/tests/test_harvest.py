@@ -5,6 +5,7 @@ import json
 import os
 from email.utils import format_datetime
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
 import psycopg
@@ -170,6 +171,33 @@ def test_an_invalid_record_is_stored_reported_and_not_published(db):
     bad = records(db, source)["bad.json"]
     assert bad["status"] == "invalid" and "public" not in bad["labels"]
     assert bad["received"] == INVALID and bad["validation"]["counts"]["violation"] > 0
+
+
+def test_a_record_that_did_not_publish_can_be_read_through_the_harvest_api(db, as_admin):
+    source = new_source(db)
+    job = harvest(db, source, Folder({"bad.json": ("30-Mar-2024 12:01", INVALID)}))
+    bad = records(db, source)["bad.json"]
+    db.commit()  # release the read lock, or the client's schema startup waits on it
+    with TestClient(app) as client:
+        # each problem in the run now names the record it is about
+        errors = client.get(f"/api/harvest/jobs/{job['id']}").json()["errors"]
+        assert any(e.get("record_id") == str(bad["id"]) for e in errors)
+        # and the record can be read: its findings, its text as received, and the CDIF it became
+        got = client.get(f"/api/harvest/records/{bad['id']}")
+        assert got.status_code == 200
+        held = got.json()
+        assert held["status"] == "invalid"
+        assert held["received"] == INVALID
+        assert held["validation"]["counts"]["violation"] > 0
+        assert held["cdif"] is not None  # it mapped, so it can be opened in the form
+        # an unknown id is a 404
+        assert client.get(f"/api/harvest/records/{uuid4()}").status_code == 404
+
+
+def test_reading_a_harvested_record_needs_the_harvest_permission(db):
+    # no as_admin: an anonymous caller is refused, as every harvest route is
+    with TestClient(app) as client:
+        assert client.get(f"/api/harvest/records/{uuid4()}").status_code in (401, 403)
 
 
 def test_a_file_that_is_not_json_is_kept_as_received_and_reported(db):
