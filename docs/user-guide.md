@@ -239,7 +239,9 @@ Today the catalog harvests six kinds of source. You must be signed in as an admi
 first page. Give the source a name and the web address of the source, choose its kind, and
 press "Add". Each
 source then has two buttons: "Harvest now" starts a run and shows its progress and its
-problems; "Retry failed" looks again at only the files that failed in the last run.
+problems; "Retry failed" looks again at only the files that failed in the last run. Beside each
+problem is a "View" button: it shows what needs fixing in that record and the record as it was
+received, and, where the record could be read into the form, opens a copy there to be corrected.
 
 **Files on your own computer** can be uploaded on the same page, under "Upload files". Give the
 batch a name, choose the files, and press "Upload". They go through the same steps as
@@ -297,7 +299,9 @@ Open `GET /api/harvest/jobs/{job_id}` with the run's `id`. When its `status` is 
 | `errored` | Something went wrong with this file. The `errors` list says what, for each one. |
 
 A record that was converted but did not pass the check counts under `errored`. It is still
-stored, so you can see what is wrong with it, but it is not published.
+stored, so you can see what is wrong with it, but it is not published. Each error names the
+`record_id` it is about; `GET /api/harvest/records/{record_id}` returns that record's findings,
+the text as it was received, and the CDIF it became, so an admin can read it or open it in the form.
 
 If some files failed for a passing reason, such as the source being briefly unreachable,
 `POST /api/harvest/jobs/{job_id}/retry` looks again at only the ones that failed.

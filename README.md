@@ -215,7 +215,8 @@ harvesters ── /catalog.ttl, /records/{id}, /sitemap.xml ─────> api
 | `POST /api/harvest/uploads` | Take a batch of metadata files, as text, and queue a run over them. Body: `{files: [{name, content}], title?, source?, organisation?}`. `title` names a new batch; `source` adds the files to an earlier one, replacing by name. |
 | `POST /api/harvest/sources/{id}/jobs` | Queue a run. Refused while one is in progress. |
 | `POST /api/harvest/sources/{id}/clear` | Remove a source's records and runs, keeping the source. |
-| `GET /api/harvest/jobs/{id}` | A run: its state, counts by outcome, and its errors by stage. |
+| `GET /api/harvest/jobs/{id}` | A run: its state, counts by outcome, and its errors by stage (each naming the record it is about). |
+| `GET /api/harvest/records/{id}` | A harvested record that did not publish, for an admin to see why: its status, the text as received and its format, the CDIF it became (null if it could not be mapped), and the validation findings. |
 | `POST /api/harvest/jobs/{id}/abort` | Stop a run. |
 | `POST /api/harvest/jobs/{id}/retry` | Queue a run that looks again at only the records that failed in this one. |
 | `GET /catalog.{ttl,jsonld,xml}` | The DCAT catalog feed. Parameters: `page`, `modified_since`, `profiles` (`dcat_ap` or `geodcat_ap`). |
