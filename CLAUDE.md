@@ -14,7 +14,7 @@ This file covers only the commands and the traps.
 
 An early prototype. Built: the `CoreDiscovery` submission form (draft saving, ORCID/ROR pickers,
 DOI pre-fill, server validation with a report, submit, plain-language wording); harvesting from
-web folders, sitemaps, CSW catalogues, OAI-PMH repositories, STAC catalogues and DCAT catalogues, and from uploaded files, with a worker; the DCAT catalog feed; record addresses with content negotiation; and
+web folders, GitHub repository folders, sitemaps, CSW catalogues, OAI-PMH repositories, STAC catalogues and DCAT catalogues, and from uploaded files, with a worker; the DCAT catalog feed; record addresses with content negotiation; and
 label-based access; and sign-in with ORCID, with an admin-only harvest API; and drafts owned by
 the signed-in user; a landing page, a search page (ranked word search, facets over source,
 publisher, profile, keyword and kind, a date-range filter and a map to search by area), a sitemap
@@ -135,6 +135,14 @@ show without a rebuild. A new Python dependency needs the image rebuilt.
   harvester does. Do not bring back per-server listing parsers. A server that sends no
   `Last-Modified` leaves its files undated; they are then fetched each run and recognised by
   content hash.
+- **The GitHub harvester lists with the Contents API and fetches from the raw host.** A
+  `github.com/{owner}/{repo}/tree/{ref}/{path}` address is parsed by `github.parse`; the ref is
+  one segment, so a branch name with a slash in it is not supported through that address. It is
+  the web folder harvester otherwise: the Contents API gives no per-file date, so files are
+  undated and recognised by content hash, and the listing is always the whole folder. It uses
+  the client it is given (so `robots.txt` is obeyed; both GitHub hosts return 404 for it, which
+  means nothing is disallowed). Unauthenticated, GitHub's API allows 60 requests an hour from one
+  address, one per folder listed; the raw files come from the CDN, not the API.
 - **A harvested file's format comes from `detect.py`, never from its name or media type.** When
   adding a format, add it to `FORMATS`, add a snippet to `test_detect.py`, and run the detector
   over the real examples in the `converters` repository (a checkout beside this one), which is
