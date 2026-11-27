@@ -182,7 +182,7 @@ harvesters ── /catalog.ttl, /records/{id}, /sitemap.xml ─────> api
 | `src/Drafts.jsx` | The signed-in person's list of their own records, each with a button to open it. |
 | `src/DoiPrefill.jsx` | The "Start from a DOI" box. Fills only fields that are still empty. |
 | `src/fit.js` | Reshapes a catalog record into the document the form edits, so a copy of a published record can be opened in the form. Follows the form's own schema; simplifies what the form cannot show. |
-| `src/renderers.jsx` | Custom form controls: the author and contributor lists, and organisation names for publisher and funder. |
+| `src/renderers.jsx` | Custom form controls: the author and contributor lists, organisation names for publisher and funder, and a distribution's kind (file download or web API) and a web service's endpoint. |
 | `src/lookup.jsx` | The search boxes those controls use, backed by `/api/lookup/…`. |
 | `src/Report.jsx` | "Check and submit": shows the server's findings and links each one to its field. |
 | `src/Account.jsx` | The "Sign in with ORCID" link, and who is signed in. Hidden when the server has no ORCID client. |
