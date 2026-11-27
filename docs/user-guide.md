@@ -202,6 +202,14 @@ fetches each metadata file, turns it into CDIF and checks it.
 Today the catalog harvests six kinds of source. You must be signed in as an administrator.
 
 - A **web folder** is a web address that lists metadata files as links.
+- A **GitHub folder** is a folder in a GitHub repository. Give the address of the folder as it
+  appears in your browser, such as
+  `https://github.com/owner/repo/tree/main/examples` (or just
+  `https://github.com/owner/repo` for the repository's default branch and its root). The catalog
+  lists the folder through GitHub's own interface and fetches each file in its raw form, so the
+  HTML that GitHub wraps around a file is not mistaken for the file. Files in subfolders are
+  picked up too. Without a sign-in, GitHub limits how often its listing can be asked, so very
+  large repositories may need to be harvested a folder at a time.
 - A **sitemap** is the file a site publishes to list its pages, usually at `/sitemap.xml`. Each
   page it lists is either a metadata file or a web page that carries its metadata inside it, as
   many data repositories' dataset pages do. A sitemap lists every page of a site, so you can

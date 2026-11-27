@@ -41,7 +41,7 @@ What works today:
   setting, and only admins can use the harvest API.
 
 What does not exist yet: harvesters for anything but web
-folders, sitemaps, CSW catalogues, OAI-PMH repositories, STAC catalogues and DCAT catalogues, converters for SDMX and the formats with none (see `docs/design.md`), search, CSW, OGC API Records, a sitemap of the catalog's own records, and any
+folders, GitHub repository folders, sitemaps, CSW catalogues, OAI-PMH repositories, STAC catalogues and DCAT catalogues, converters for SDMX and the formats with none (see `docs/design.md`), search, CSW, OGC API Records, a sitemap of the catalog's own records, and any
 review step after submission. A submitted record is not published: only harvested records appear
 in the feed. See [Intended scope](#intended-scope).
 
@@ -137,6 +137,7 @@ harvesters ── /catalog.ttl, /records/{id}, /sitemap.xml ─────> api
 | `app/harvest/robots.py` | Obeys a site's `robots.txt`: what may be fetched, and the delay between requests. |
 | `app/harvest/csw.py` | The CSW harvester: asks a catalogue for the list of its records a page at a time, then for each record in full by its identifier, and takes the record out of the response's wrapper. |
 | `app/harvest/dcat.py` | The DCAT harvester: reads a catalogue (Turtle, RDF/XML, JSON-LD or a `data.json`) as a graph, follows its pages, and cuts each dataset out as a document of its own. |
+| `app/harvest/github.py` | The GitHub folder harvester: lists a repository folder with the Contents API and fetches each file from its raw address, since the web addresses serve HTML, not the file. |
 | `app/harvest/oai.py` | The OAI-PMH harvester: asks a repository for its record identifiers a batch at a time, then for each record by its identifier, and takes the record out of the response's wrapper. |
 | `app/harvest/sitemap.py` | The sitemap harvester: reads a sitemap (or an index of them, compressed or not) for each page's address and date, and takes the JSON-LD embedded in a page as its metadata. |
 | `app/harvest/stac.py` | The STAC harvester: takes each collection of a STAC service, of a list of collections, or of a catalogue file followed through its child links. Items are not harvested. |
@@ -233,7 +234,7 @@ With the application running, FastAPI's own interactive page for these is at htt
 
 ## Intended scope
 
-- **Harvest** metadata from sitemaps, CSW, OAI-PMH, web-accessible folders, CKAN, STAC and DCAT sources, and from file upload.
+- **Harvest** metadata from sitemaps, CSW, OAI-PMH, web-accessible folders, GitHub repository folders, CKAN, STAC and DCAT sources, and from file upload.
 - **Map** each source format directly to CDIF JSON-LD.
 - **Validate** every record with the CDIF JSON Schema and SHACL rules from metadataBuildingBlocks.
 - **Store** records in PostgreSQL. Edits to harvested records are kept as an overlay so a re-harvest does not erase them.
