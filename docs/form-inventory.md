@@ -65,7 +65,7 @@ Technique and Quality Measurements. They were not opened in this pass.
 
 | Where | What the author sees | Proposed handling |
 |---|---|---|
-| Distributions | 20-odd fields with generated labels: "Schema Content Url", "Spdx Algorithm", "Dcterms Conforms To", "Schema Potential Action" | Hand-written layout for a distribution: URL, format, size; the rest behind "More" |
+| Distributions | 20-odd fields with generated labels: "Schema Content Url", "Spdx Algorithm", "Dcterms Conforms To", "Schema Potential Action" | Built (`corrections.js`, `renderers.jsx`): a hand-written layout with a kind chooser (a file to download, or a web API); for a download, its address, format and size; for a web API, its service type, endpoint, terms of use and service description. The rest (checksum, image sizes) stay behind "More". |
 | Keywords help | A paragraph about parsing variability and `schema:DefinedTerm` | Rewrite for authors, upstream |
 | Related Links help | Repository history ("Defined by schemaorgProperties/linkRole since 2026-09-23…") | Rewrite, upstream |
 | Publishing Principles help | "FDOF digitalObjectMutability, RDA digitalObjectPolicy…" | Rewrite, upstream |
@@ -138,8 +138,10 @@ cannot hold), and without the second of those the records with variables did not
 
 Seen in the browser on the first record:
 
-- **A download is still the stock rendering**: some twenty fields labelled "Schema Content Url",
-  "Spdx Algorithm *" and the like (section C). It is the largest piece of jargon left in the form.
+- **A download was still the stock rendering** on the day of the dry run: some twenty fields
+  labelled "Schema Content Url", "Spdx Algorithm *" and the like (section C), the largest piece of
+  jargon then left in the form. Since replaced by a hand-written layout with a kind chooser (file
+  download or web API) and the fields for the kind chosen.
 - **A new variable's description arrived filled with the word "missing"** (item 3 below, not yet
   corrected in the form files), and was saved and submitted as the description. Corrected the
   same day in `web/src/corrections.js`, which takes that default out when the form loads.

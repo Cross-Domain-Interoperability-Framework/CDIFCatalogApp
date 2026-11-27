@@ -43,8 +43,13 @@
     "label": "Authors",
     "help": "The people and organisations who created the dataset, in the order they should be cited."
   },
-  "schema:creator/@list/@type": { "label": "Person or organisation" },
-  "schema:creator/@list/schema:name": { "label": "Name", "help": "For a person: family name, given name." },
+  "schema:creator/@list/@type": {
+    "label": "Person or organisation"
+  },
+  "schema:creator/@list/schema:name": {
+    "label": "Name",
+    "help": "For a person: family name, given name."
+  },
   "schema:creator/@list/schema:identifier": {
     "label": "ORCID iD or other identifier",
     "help": "Written as a full address, such as https://orcid.org/0000-0002-1825-0097."
@@ -53,18 +58,26 @@
     "label": "Organisation",
     "help": "Where the author worked when the data were created."
   },
-  "schema:creator/@list/schema:alternateName": { "label": "Other form of the name" },
+  "schema:creator/@list/schema:alternateName": {
+    "label": "Other form of the name"
+  },
   "schema:contributor": {
     "label": "Contributors",
     "help": "People and organisations who helped but are not authors, each with what they did."
   },
-  "schema:contributor/schema:name": { "label": "Name" },
+  "schema:contributor/schema:name": {
+    "label": "Name"
+  },
   "schema:contributor/schema:roleName": {
     "label": "What they did",
     "help": "For example: data curator, field assistant, reviewer."
   },
-  "schema:contributor/schema:identifier": { "label": "ORCID iD or other identifier" },
-  "schema:contributor/schema:affiliation/schema:name": { "label": "Organisation" },
+  "schema:contributor/schema:identifier": {
+    "label": "ORCID iD or other identifier"
+  },
+  "schema:contributor/schema:affiliation/schema:name": {
+    "label": "Organisation"
+  },
   "schema:publisher/schema:name": {
     "label": "Publisher",
     "help": "The organisation that makes the dataset available, usually the repository that holds it."
@@ -77,13 +90,19 @@
     "label": "Data providers",
     "help": "Organisations or people who supply the data files, if different from the publisher."
   },
-  "schema:provider/schema:name": { "label": "Name" },
+  "schema:provider/schema:name": {
+    "label": "Name"
+  },
   "schema:funding": {
     "label": "Grants",
     "help": "The grants or awards that paid for the work."
   },
-  "schema:funding/schema:name": { "label": "Grant title" },
-  "schema:funding/schema:description": { "label": "Description" },
+  "schema:funding/schema:name": {
+    "label": "Grant title"
+  },
+  "schema:funding/schema:description": {
+    "label": "Description"
+  },
   "schema:funding/schema:funder/schema:name": {
     "label": "Funder",
     "help": "The organisation that awarded the grant."
@@ -96,7 +115,9 @@
     "label": "Kind of number",
     "help": "What sort of number this is. For example: award number."
   },
-  "schema:funding/schema:identifier/schema:value": { "label": "Number" },
+  "schema:funding/schema:identifier/schema:value": {
+    "label": "Number"
+  },
   "schema:funding/schema:identifier/schema:url": {
     "label": "Web address",
     "help": "The funder's page for the grant, if there is one."
@@ -117,7 +138,9 @@
     "label": "Licence",
     "help": "The terms under which others may use the data. For example: CC BY 4.0, with the address of the licence text."
   },
-  "schema:license/schema:name": { "label": "Licence name" },
+  "schema:license/schema:name": {
+    "label": "Licence name"
+  },
   "schema:license/schema:url": {
     "label": "Licence address",
     "help": "For example: https://creativecommons.org/licenses/by/4.0/"
@@ -126,21 +149,39 @@
     "label": "Conditions of access",
     "help": "Anything that limits who can get the data or when, such as an embargo or a registration step."
   },
-  "schema:conditionsOfAccess/schema:name": { "label": "Condition" },
-  "schema:conditionsOfAccess/schema:description": { "label": "Description" },
-  "schema:conditionsOfAccess/schema:url": { "label": "Web address" },
-  "schema:distribution": {
-    "label": "Downloads",
-    "help": "Each file that can be downloaded, with the web address it is fetched from."
+  "schema:conditionsOfAccess/schema:name": {
+    "label": "Condition"
   },
-  "schema:distribution/schema:name": { "label": "File name or title", "help": "A short name for the file." },
-  "schema:distribution/schema:contentUrl": { "label": "Web address of the file", "help": "The address the file is downloaded from." },
+  "schema:conditionsOfAccess/schema:description": {
+    "label": "Description"
+  },
+  "schema:conditionsOfAccess/schema:url": {
+    "label": "Web address"
+  },
+  "schema:distribution": {
+    "label": "Distributions",
+    "help": "Each way to get the data: a file to download, or a web API or service."
+  },
+  "schema:distribution/schema:name": {
+    "label": "Name or title",
+    "help": "A short name for this file or service."
+  },
+  "schema:distribution/schema:contentUrl": {
+    "label": "Web address of the file",
+    "help": "The address the file is downloaded from."
+  },
   "schema:distribution/schema:encodingFormat": {
     "label": "File format",
     "help": "For example: text/csv, application/zip. Press Enter after each one."
   },
-  "schema:distribution/schema:contentSize": { "label": "Size", "help": "For example: 24 MB." },
-  "schema:distribution/schema:description": { "label": "Description", "help": "What the file holds." },
+  "schema:distribution/schema:contentSize": {
+    "label": "Size",
+    "help": "For example: 24 MB."
+  },
+  "schema:distribution/schema:description": {
+    "label": "Description",
+    "help": "What the file holds."
+  },
   "schema:relatedLink": {
     "label": "Related links",
     "help": "Papers, documentation, software or other datasets connected to this one."
@@ -149,8 +190,12 @@
     "label": "How it is related",
     "help": "For example: documentation, described in, source code."
   },
-  "schema:relatedLink/schema:target/schema:name": { "label": "Name of the linked item" },
-  "schema:relatedLink/schema:target/schema:url": { "label": "Web address" },
+  "schema:relatedLink/schema:target/schema:name": {
+    "label": "Name of the linked item"
+  },
+  "schema:relatedLink/schema:target/schema:url": {
+    "label": "Web address"
+  },
   "schema:publishingPrinciples": {
     "label": "Publishing policies",
     "help": "Optional. Policies the dataset was published under, such as a repository's data policy."
@@ -159,7 +204,9 @@
     "label": "Where the data are from",
     "help": "The place or area the data describe. Give a place name, a bounding box, or both."
   },
-  "schema:spatialCoverage/schema:name": { "label": "Place name" },
+  "schema:spatialCoverage/schema:name": {
+    "label": "Place name"
+  },
   "schema:spatialCoverage/schema:geo/schema:box": {
     "label": "Bounding box",
     "help": "Four numbers in decimal degrees: south, west, north, east. For example: 53.0 -60.0 65.0 -45.0."
@@ -176,7 +223,10 @@
     "label": "Name",
     "help": "The variable's name as it appears in the data."
   },
-  "schema:variableMeasured/schema:unitText": { "label": "Unit", "help": "For example: degrees Celsius." },
+  "schema:variableMeasured/schema:unitText": {
+    "label": "Unit",
+    "help": "For example: degrees Celsius."
+  },
   "schema:variableMeasured/schema:description": {
     "label": "Description",
     "help": "A sentence saying what the variable holds."
@@ -193,8 +243,12 @@
     "label": "Who maintains this description",
     "help": "The person or organisation to contact about this record, as opposed to the data."
   },
-  "schema:subjectOf/schema:maintainer/@type": { "label": "Person or organisation" },
-  "schema:subjectOf/schema:maintainer/schema:name": { "label": "Name" },
+  "schema:subjectOf/schema:maintainer/@type": {
+    "label": "Person or organisation"
+  },
+  "schema:subjectOf/schema:maintainer/schema:name": {
+    "label": "Name"
+  },
   "schema:subjectOf/schema:sdDatePublished": {
     "label": "Date this description was published",
     "help": "Leave empty to use today's date."
@@ -202,5 +256,25 @@
   "schema:subjectOf/schema:includedInDataCatalog/schema:name": {
     "label": "Source catalog",
     "help": "Optional. The catalog this description first appeared in, if it was copied from one."
+  },
+  "schema:distribution/@type": {
+    "label": "Kind",
+    "help": "Whether this is a file to download or a web API or service."
+  },
+  "schema:distribution/schema:serviceType": {
+    "label": "Service type",
+    "help": "The kind of service, such as OGC WMS or a REST API. A resolvable identifier is best where one exists."
+  },
+  "schema:distribution/schema:documentation": {
+    "label": "Service description",
+    "help": "The web address of a document describing the service, such as an OpenAPI description or an OGC capabilities document."
+  },
+  "schema:distribution/schema:termsOfService": {
+    "label": "Terms of use",
+    "help": "Any registration, licence or payment needed to use the service."
+  },
+  "schema:distribution/schema:potentialAction": {
+    "label": "Service endpoint",
+    "help": "The web address the service is called at. Give the operation a short name, such as 'GetMap' or 'Search'."
   }
 }

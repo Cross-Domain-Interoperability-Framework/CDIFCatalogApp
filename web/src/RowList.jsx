@@ -19,7 +19,7 @@ const ON_ROW = {
   'schema:relatedLink': ['schema:linkRelationship', 'schema:target/schema:url'],
   'schema:variableMeasured': ['schema:name', 'schema:unitText'],
   'schema:spatialCoverage': ['schema:name', 'schema:geo/schema:box'],
-  'schema:distribution': ['schema:name', 'schema:contentUrl'],
+  'schema:distribution': ['@type', 'schema:name', 'schema:contentUrl'],
 };
 
 // "#/properties/schema:funder/properties/schema:name" -> ["schema:funder", "schema:name"]

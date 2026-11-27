@@ -274,7 +274,68 @@ function IdentifierKind({ data, handleChange, path, label, description, enabled,
   );
 }
 
+// A distribution is a file to download or a web API. The schema holds the choice as a list of type
+// markers; the form holds it as one word (the server lists it again on save), shown here as a
+// plain two-option menu. A record copied in may hold the list form, so read the first of it.
+const DOWNLOAD = 'schema:DataDownload';
+const WEB_API = 'schema:WebAPI';
+
+function DistributionKind({ data, handleChange, path, label, description, visible }) {
+  if (visible === false) return null;
+  const current = Array.isArray(data) ? data[0] : data;
+  return (
+    <TextField
+      label={label || 'Kind'}
+      helperText={description}
+      select
+      fullWidth
+      value={current === WEB_API ? WEB_API : DOWNLOAD}
+      onChange={(e) => handleChange(path, e.target.value)}
+      sx={{ my: 1 }}
+    >
+      <MenuItem value={DOWNLOAD}>A file to download</MenuItem>
+      <MenuItem value={WEB_API}>A web API or service</MenuItem>
+    </TextField>
+  );
+}
+
+// A web service's endpoint. The schema wants at least one action, each with a name and a target
+// giving the address to call (an EntryPoint with a URL template). Most services need only the one,
+// so two boxes do: an operation name and the address. The type markers and the EntryPoint wrapper
+// are built here; the server lists the markers on save.
+function ServiceEndpoint({ data, handleChange, path, label, description, visible }) {
+  if (visible === false) return null;
+  const action = Array.isArray(data) ? data[0] : undefined;
+  const name = action?.['schema:name'] || '';
+  const url = action?.['schema:target']?.['schema:urlTemplate'] || '';
+  const write = (nextName, nextUrl) => {
+    if (!nextName && !nextUrl) return handleChange(path, undefined);
+    handleChange(path, [clean({
+      '@type': 'schema:Action',
+      'schema:name': nextName,
+      'schema:target': clean({ '@type': 'schema:EntryPoint', 'schema:urlTemplate': nextUrl }),
+    })]);
+  };
+  return (
+    <Box sx={{ my: 1 }}>
+      {label && <Typography variant="caption" color="text.secondary">{label}</Typography>}
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+        <TextField label="Operation name" sx={{ minWidth: 180 }} value={name} onChange={(e) => write(e.target.value, url)} />
+        <TextField label="Endpoint address" fullWidth value={url} onChange={(e) => write(name, e.target.value)} helperText={description} />
+      </Stack>
+    </Box>
+  );
+}
+
 export const customRenderers = [
+  {
+    tester: rankWith(10, schemaMatches((s) => Array.isArray(s.enum) && s.enum.includes(WEB_API))),
+    renderer: withJsonFormsControlProps(DistributionKind),
+  },
+  {
+    tester: rankWith(10, scopeEndsWith('#/properties/schema:potentialAction')),
+    renderer: withJsonFormsControlProps(ServiceEndpoint),
+  },
   { tester: rankWith(10, scopeEndsWith('schema:creator/properties/@list')), renderer: PartyListControl },
   { tester: rankWith(10, scopeEndsWith('#/properties/schema:contributor')), renderer: PartyListControl },
   {
